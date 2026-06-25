@@ -1,0 +1,63 @@
+# ============================================
+# SIMPEL-CAMP — Apache Security Configuration
+# ============================================
+
+# --- Prevent directory listing ---
+Options -Indexes
+
+# --- Disable error display in production ---
+php_flag display_errors Off
+php_flag log_errors On
+
+# --- Block access to sensitive directories ---
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Block direct access to config/
+    RewriteRule ^config/ - [F,L]
+
+    # Block direct access to classes/
+    RewriteRule ^classes/ - [F,L]
+
+    # Block direct access to includes/
+    RewriteRule ^includes/ - [F,L]
+
+    # Block direct access to docs/
+    RewriteRule ^docs/ - [F,L]
+
+    # Block access to .sql files
+    RewriteRule \.sql$ - [F,L]
+
+    # Block access to seed.php
+    RewriteRule ^seed\.php$ - [F,L]
+
+    # Block access to .env files
+    RewriteRule \.env$ - [F,L]
+
+    # Block access to .htaccess itself
+    RewriteRule \.htaccess$ - [F,L]
+</IfModule>
+
+# --- Fallback: block sensitive files via FilesMatch ---
+<FilesMatch "\.(sql|env|log|bak|inc)$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Deny from all
+    </IfModule>
+</FilesMatch>
+
+# --- Security Headers ---
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-Frame-Options "SAMEORIGIN"
+    Header set X-XSS-Protection "1; mode=block"
+    Header set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>
+
+# --- Prevent access to hidden files (.git, .env, etc.) ---
+<IfModule mod_rewrite.c>
+    RewriteRule (^|/)\.(?!well-known) - [F,L]
+</IfModule>

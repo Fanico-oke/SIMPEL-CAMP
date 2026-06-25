@@ -1,0 +1,168 @@
+/* assets/css/style.css */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@400;600;700&family=JetBrains+Mono:wght@500&display=swap');
+
+:root {
+    /* Color Palette */
+    --primary: #1B4332;
+    --primary-light: #2D6A4F;
+    --primary-lighter: #52B788;
+    --accent: #D4A373;
+    --accent-light: #E9C46A;
+    --bg-dark: #0F2B1E;
+    --bg-body: #F8FAF7;
+    --bg-card: #FFFFFF;
+    --text-primary: #1A1A2E;
+    --text-secondary: #6B7280;
+    --text-light: #F1F5F0;
+    --success: #10B981;
+    --danger: #EF4444;
+    --warning: #F59E0B;
+    --info: #3B82F6;
+    --border: #E5E7EB;
+    --shadow: rgba(27,67,50,0.08);
+
+    /* Spacing & Radius */
+    --radius-sm: 6px;
+    --radius-md: 12px;
+    --radius-lg: 20px;
+    --radius-xl: 28px;
+}
+
+body {
+    font-family: 'Inter', sans-serif;
+    background-color: var(--bg-body);
+    color: var(--text-primary);
+    -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4, h5, h6, .navbar-brand {
+    font-family: 'Outfit', sans-serif;
+    font-weight: 700;
+}
+
+.mono-font {
+    font-family: 'JetBrains Mono', monospace;
+}
+
+/* Base Components */
+.sc-card {
+    background: var(--bg-card);
+    border-radius: var(--radius-md);
+    box-shadow: 0 4px 6px -1px var(--shadow), 0 2px 4px -1px var(--shadow);
+    border: 1px solid var(--border);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sc-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 10px 15px -3px var(--shadow), 0 4px 6px -2px var(--shadow);
+}
+
+/* Buttons */
+.btn-sc-primary {
+    background-color: var(--primary);
+    color: var(--text-light);
+    border-radius: var(--radius-sm);
+    font-weight: 600;
+    padding: 0.6rem 1.5rem;
+    transition: all 0.2s ease;
+    border: none;
+}
+
+.btn-sc-primary:hover {
+    background-color: var(--primary-light);
+    color: var(--text-light);
+}
+
+.btn-sc-accent {
+    background-color: var(--accent);
+    color: var(--text-primary);
+    border-radius: var(--radius-sm);
+    font-weight: 600;
+    padding: 0.6rem 1.5rem;
+    transition: all 0.2s ease;
+    border: none;
+}
+
+.btn-sc-accent:hover {
+    background-color: #c49566;
+    color: var(--text-primary);
+}
+
+/* Navbar */
+.sc-navbar {
+    background-color: rgba(15, 43, 30, 0.95);
+    padding: 1rem 0;
+    transition: all 0.3s ease;
+}
+
+.sc-navbar.navbar-transparent {
+    background-color: transparent;
+    padding: 1.5rem 0;
+}
+
+.sc-navbar .nav-link {
+    color: rgba(241, 245, 240, 0.8) !important;
+    font-weight: 500;
+    margin: 0 0.5rem;
+    transition: color 0.2s ease;
+}
+
+.sc-navbar .nav-link:hover,
+.sc-navbar .nav-link.active {
+    color: var(--text-light) !important;
+}
+
+.sc-navbar .navbar-brand {
+    color: var(--text-light) !important;
+    font-size: 1.5rem;
+}
+
+.sc-navbar .navbar-brand span {
+    color: var(--accent);
+}
+
+/* Utilities */
+.text-primary-theme { color: var(--primary) !important; }
+.text-accent-theme { color: var(--accent) !important; }
+.bg-primary-theme { background-color: var(--primary) !important; }
+.bg-dark-theme { background-color: #0F2B1E !important; }
+.text-accent-light { color: #E9C46A !important; }
+
+/* Animations */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.animate-fade-up {
+    animation: fadeInUp 0.6s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+/* Footer */
+.sc-footer {
+    background-color: var(--bg-dark);
+    color: rgba(241, 245, 240, 0.7);
+    padding: 4rem 0 2rem;
+}
+
+.sc-footer h5 {
+    color: var(--text-light);
+    margin-bottom: 1.5rem;
+}
+
+.sc-footer a {
+    color: rgba(241, 245, 240, 0.7);
+    text-decoration: none;
+    transition: color 0.2s ease;
+}
+
+.sc-footer a:hover {
+    color: var(--accent);
+}
