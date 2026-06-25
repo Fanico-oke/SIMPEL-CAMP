@@ -6,6 +6,23 @@ define('APP_NAME', 'SIMPEL-CAMP');
 define('APP_VERSION', '1.0.0');
 
 // ============================================
+// Error Display (auto-detect environment)
+// ============================================
+$_is_local = isset($_SERVER['HTTP_HOST']) && (
+    $_SERVER['HTTP_HOST'] === 'localhost' || 
+    strpos($_SERVER['HTTP_HOST'], 'localhost:') === 0 ||
+    $_SERVER['HTTP_HOST'] === '127.0.0.1'
+);
+if ($_is_local) {
+    ini_set('display_errors', 1);
+    error_reporting(E_ALL);
+} else {
+    ini_set('display_errors', 0);
+    ini_set('log_errors', 1);
+    error_reporting(E_ALL & ~E_NOTICE & ~E_DEPRECATED);
+}
+
+// ============================================
 // Database Configuration
 // Ubah sesuai hosting Anda
 // ============================================

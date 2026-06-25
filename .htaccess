@@ -5,9 +5,8 @@
 # --- Prevent directory listing ---
 Options -Indexes
 
-# --- Disable error display in production ---
-php_flag display_errors Off
-php_flag log_errors On
+# --- Error handling via PHP (php_flag not supported on some hosts) ---
+# display_errors diatur via PHP di config/constants.php
 
 # --- Block access to sensitive directories ---
 <IfModule mod_rewrite.c>

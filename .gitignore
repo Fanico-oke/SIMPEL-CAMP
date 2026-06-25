@@ -5,6 +5,8 @@
 # Uploads (user content)
 /frontend/uploads/*
 !/frontend/uploads/.gitkeep
+# Database export
+simpelcamp_export.sql
 
 # Environment
 .env
