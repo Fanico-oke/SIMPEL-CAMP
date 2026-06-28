@@ -505,7 +505,7 @@ $adminName = $_SESSION['nama'] ?? 'Admin';
                     <div class="dash-section mb-4">
                         <div class="section-title">
                             <i class="bi bi-clipboard-data"></i>Reservasi Terbaru
-                            <a href="<?= BASE_URL ?>/pages/admin/reservasi.php" class="ms-auto text-decoration-none small fw-semibold" style="color:var(--primary-lighter)">Lihat Semua →</a>
+                            <a href="<?= BASE_URL ?>/pages/admin/transaksi.php" class="ms-auto text-decoration-none small fw-semibold" style="color:var(--primary-lighter)">Lihat Semua →</a>
                         </div>
 
                         <?php if (empty($recentReservasi)): ?>

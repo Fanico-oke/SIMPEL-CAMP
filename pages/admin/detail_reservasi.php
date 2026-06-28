@@ -138,7 +138,7 @@ $adminName = $_SESSION['nama'] ?? 'Admin';
         <div class="admin-content">
 
             <div class="detail-header">
-                <a href="<?= BASE_URL ?>/pages/admin/reservasi.php" class="btn-back">
+                <a href="<?= BASE_URL ?>/pages/admin/transaksi.php" class="btn-back">
                     <i class="bi bi-arrow-left"></i> Kembali
                 </a>
                 <h2 class="detail-title">Detail Reservasi <span class="rsv-id">#<?= htmlspecialchars($rsvKode) ?></span></h2>
