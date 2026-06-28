@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // pages/admin/detail_reservasi.php
 require_once dirname(__DIR__, 2) . '/config/constants.php';
 require_once dirname(__DIR__, 2) . '/includes/auth.php';
@@ -242,7 +242,7 @@ $adminName = $_SESSION['nama'] ?? 'Admin';
                                     $metode = '-';
                                     if (!empty($reservasi['id'])) {
                                         $dbPay = Database::getInstance();
-                                        $stmtPay = $dbPay->prepare("SELECT metode FROM pembayaran WHERE reservasi_id = ? ORDER BY created_at DESC LIMIT 1");
+                                        $stmtPay = $dbPay->prepare("SELECT p.metode FROM pembayaran p JOIN transaksi t ON p.transaksi_id = t.id WHERE t.reservasi_id = ? ORDER BY p.tanggal_bayar DESC LIMIT 1");
                                         $stmtPay->execute([$reservasi['id']]);
                                         $payRow = $stmtPay->fetch();
                                         if ($payRow) $metode = ucfirst($payRow['metode']);
@@ -311,10 +311,13 @@ $adminName = $_SESSION['nama'] ?? 'Admin';
                 <button class="btn-action btn-approve" onclick="confirmAction('approve')"><i class="bi bi-check-circle"></i> Approve</button>
                 <button class="btn-action btn-reject" onclick="confirmAction('reject')"><i class="bi bi-x-circle"></i> Reject</button>
                 <?php endif; ?>
+                <?php if ($status == 'dikonfirmasi' || $status == 'disetujui'): ?>
+                <button class="btn-action btn-approve" onclick="confirmAction('activate')"><i class="bi bi-cash-coin"></i> Lunas & Barang Diambil</button>
+                <?php endif; ?>
                 <?php if ($status == 'aktif'): ?>
                 <button class="btn-action btn-return" onclick="confirmAction('return')"><i class="bi bi-box-arrow-in-left"></i> Tandai Dikembalikan</button>
                 <?php endif; ?>
-                <a href="<?= BASE_URL ?>/pages/admin/reservasi.php" class="btn-action btn-nota"><i class="bi bi-arrow-left"></i> Kembali ke Daftar</a>
+                <a href="<?= BASE_URL ?>/pages/admin/transaksi.php" class="btn-action btn-nota"><i class="bi bi-arrow-left"></i> Kembali ke Daftar</a>
             </div>
 
         </div>
@@ -327,7 +330,8 @@ function confirmAction(action) {
     const messages = {
         approve: 'Apakah Anda yakin ingin meng-approve reservasi #<?= htmlspecialchars($rsvKode) ?>?',
         reject: 'Apakah Anda yakin ingin menolak reservasi #<?= htmlspecialchars($rsvKode) ?>?',
-        return: 'Tandai reservasi #<?= htmlspecialchars($rsvKode) ?> sebagai dikembalikan?'
+        return: 'Tandai reservasi #<?= htmlspecialchars($rsvKode) ?> sebagai dikembalikan?',
+        activate: 'Konfirmasi pembayaran lunas dan barang telah diambil oleh pelanggan?'
     };
 
     if (!confirm(messages[action])) return;

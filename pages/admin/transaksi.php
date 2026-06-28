@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 require_once dirname(__DIR__, 2) . '/config/constants.php';
 require_once dirname(__DIR__, 2) . '/includes/auth.php';
 require_once dirname(__DIR__, 2) . '/classes/Transaksi.php';
@@ -199,7 +199,9 @@ h1,h2,h3,h4,h5,h6,.heading{font-family:'Outfit',sans-serif}
                     <?php if ($isPending): ?>
                     <div class="card-actions-row" id="actions-<?= $rsv['id'] ?>"><button class="btn btn-approve flex-fill" onclick="approveReservation(<?= $rsv['id'] ?>)"><i class="bi bi-check-lg me-1"></i>Setujui</button><button class="btn btn-reject flex-fill" onclick="rejectReservation(<?= $rsv['id'] ?>)"><i class="bi bi-x-lg me-1"></i>Tolak</button></div>
                     <?php else: ?>
-                    <div class="card-actions-row"><span class="badge bg-success bg-opacity-10 text-success px-3 py-2 rounded-pill flex-fill text-center"><i class="bi bi-check-circle me-1"></i>Disetujui</span></div>
+                    <div class="card-actions-row">
+                        <a href="<?= BASE_URL ?>/pages/admin/detail_reservasi.php?id=<?= $rsv['id'] ?>" class="btn btn-approve flex-fill text-center text-decoration-none" style="background:var(--t-mid)"><i class="bi bi-box-arrow-up-right me-1"></i>Lihat Detail</a>
+                    </div>
                     <?php endif; ?>
                 </div></div>
                 <?php endforeach; ?>
@@ -209,13 +211,22 @@ h1,h2,h3,h4,h5,h6,.heading{font-family:'Outfit',sans-serif}
             <div class="trx-table stagger-item">
                 <div class="p-3 d-flex justify-content-between align-items-center"><h5 class="heading fw-bold mb-0"><i class="bi bi-list-ul me-2 text-muted"></i>Semua Reservasi</h5><span class="badge rounded-pill" style="background:rgba(82,183,136,0.12);color:#2D6A4F;font-weight:600;padding:6px 14px"><?= count($rsvList) ?> Total</span></div>
                 <div class="table-responsive"><table class="table align-middle">
-                    <thead><tr><th>ID</th><th>Pelanggan</th><th>Barang</th><th>Tanggal Sewa</th><th>Durasi</th><th>Total</th><th>Status</th></tr></thead>
+                    <thead><tr><th>ID</th><th>Pelanggan</th><th>Barang</th><th>Tanggal Sewa</th><th>Durasi</th><th>Total</th><th>Status</th><th>Aksi</th></tr></thead>
                     <tbody>
                         <?php if (empty($rsvList)): ?>
-                        <tr><td colspan="7" class="text-center text-muted py-4">Belum ada reservasi</td></tr>
+                        <tr><td colspan="8" class="text-center text-muted py-4">Belum ada reservasi</td></tr>
                         <?php else: ?>
                         <?php foreach ($rsvList as $rv): ?>
-                        <tr><td class="mono fw-semibold"><?= htmlspecialchars($rv['kode']) ?></td><td><?= htmlspecialchars($rv['pelanggan']) ?></td><td><?= htmlspecialchars(mb_strimwidth($rv['barang'], 0, 40, '...')) ?></td><td><?= $rv['tgl'] ?></td><td><?= $rv['durasi'] ?></td><td class="mono fw-bold" style="color:var(--t-mid)">Rp <?= number_format($rv['total'], 0, ',', '.') ?></td><td><span class="badge-status <?= $rv['status_class'] ?>"><?= $rv['status_label'] ?></span></td></tr>
+                        <tr>
+                            <td class="mono fw-semibold"><?= htmlspecialchars($rv['kode']) ?></td>
+                            <td><?= htmlspecialchars($rv['pelanggan']) ?></td>
+                            <td><?= htmlspecialchars(mb_strimwidth($rv['barang'], 0, 40, '...')) ?></td>
+                            <td><?= $rv['tgl'] ?></td>
+                            <td><?= $rv['durasi'] ?></td>
+                            <td class="mono fw-bold" style="color:var(--t-mid)">Rp <?= number_format($rv['total'], 0, ',', '.') ?></td>
+                            <td><span class="badge-status <?= $rv['status_class'] ?>"><?= $rv['status_label'] ?></span></td>
+                            <td><a href="<?= BASE_URL ?>/pages/admin/detail_reservasi.php?id=<?= $rsvList[array_search($rv, $rsvList)]['id'] ?? (int)$allReservasi[array_search($rv, $rsvList)]['id'] ?>" class="btn btn-sm btn-outline-success rounded-pill px-3" style="font-size:0.75rem;font-weight:600">Detail</a></td>
+                        </tr>
                         <?php endforeach; ?>
                         <?php endif; ?>
                     </tbody>

@@ -221,10 +221,12 @@ class Barang {
         try {
             $db = Database::getInstance();
             $stmt = $db->prepare("
-                SELECT b.*, k.nama AS kategori_nama, COUNT(dr.id) AS total_sewa
+                SELECT b.*, k.nama AS kategori_nama, SUM(dr.jumlah) AS total_sewa
                 FROM barang b
+                JOIN detail_reservasi dr ON b.id = dr.barang_id
+                JOIN reservasi r ON dr.reservasi_id = r.id
                 LEFT JOIN kategori k ON b.kategori_id = k.id
-                LEFT JOIN detail_reservasi dr ON b.id = dr.barang_id
+                WHERE r.status IN ('aktif', 'selesai')
                 GROUP BY b.id
                 ORDER BY total_sewa DESC
                 LIMIT :limit

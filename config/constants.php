@@ -8,11 +8,12 @@ define('APP_VERSION', '1.0.0');
 // ============================================
 // Error Display (auto-detect environment)
 // ============================================
-$_is_local = isset($_SERVER['HTTP_HOST']) && (
+$_is_local = (isset($_SERVER['HTTP_HOST']) && (
     $_SERVER['HTTP_HOST'] === 'localhost' || 
     strpos($_SERVER['HTTP_HOST'], 'localhost:') === 0 ||
-    $_SERVER['HTTP_HOST'] === '127.0.0.1'
-);
+    $_SERVER['HTTP_HOST'] === '127.0.0.1' ||
+    strpos($_SERVER['HTTP_HOST'], '.test') !== false
+)) || php_sapi_name() === 'cli';
 if ($_is_local) {
     ini_set('display_errors', 1);
     error_reporting(E_ALL);
@@ -26,10 +27,19 @@ if ($_is_local) {
 // Database Configuration
 // Ubah sesuai hosting Anda
 // ============================================
-define('DB_HOST', 'localhost');
-define('DB_NAME', 'simpelcamp');
-define('DB_USER', 'root');
-define('DB_PASS', '');
+if ($_is_local) {
+    // Development (Laragon/XAMPP)
+    define('DB_HOST', 'localhost');
+    define('DB_NAME', 'simpelcamp');
+    define('DB_USER', 'root');
+    define('DB_PASS', '');
+} else {
+    // Production (InfinityFree)
+    define('DB_HOST', 'sql211.infinityfree.com');
+    define('DB_NAME', 'if0_42274556_simpelcamp');
+    define('DB_USER', 'if0_42274556');
+    define('DB_PASS', 'oyjDPS5kpxEav4B');
+}
 
 // ============================================
 // URL Configuration (Auto-detect)

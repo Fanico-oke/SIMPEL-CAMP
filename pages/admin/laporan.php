@@ -136,7 +136,7 @@ h1,h2,h3,h4,h5,h6,.heading{font-family:'Outfit',sans-serif}
 .lp-tab:hover:not(.active){background:rgba(82,183,136,0.08);color:var(--lp-mid)}
 
 /* Stat Cards */
-.stat-card{background:#fff;border-radius:16px;padding:22px;box-shadow:0 2px 14px rgba(0,0,0,0.05);transition:all .35s;border-left:4px solid var(--lp-light);height:100%}
+.stat-card{background:#fff;border-radius:16px;padding:22px;box-shadow:0 2px 14px rgba(0,0,0,0.05);transition:all .35s;border-left:4px solid var(--lp-light);height:100%;display:block !important;}
 .stat-card:hover{transform:translateY(-4px);box-shadow:0 10px 28px rgba(0,0,0,0.08)}
 .stat-card .stat-icon{width:48px;height:48px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:1.3rem;flex-shrink:0}
 .stat-card .stat-icon.green{background:rgba(82,183,136,0.12);color:var(--lp-light)}
@@ -377,11 +377,29 @@ h1,h2,h3,h4,h5,h6,.heading{font-family:'Outfit',sans-serif}
                                 <table class="table align-middle">
                                     <thead><tr><th>#</th><th>Nama Barang</th><th>Kategori</th><th>Total</th><th>Pendapatan</th></tr></thead>
                                     <tbody>
-                                        <tr><td><div class="rank-circle">1</div></td><td class="fw-semibold">Tenda Dome 4P</td><td><span class="badge-cat tenda">Tenda</span></td><td>32x</td><td class="mono fw-bold text-income">Rp 2.400.000</td></tr>
-                                        <tr><td><div class="rank-circle">2</div></td><td class="fw-semibold">Carrier 60L</td><td><span class="badge-cat tas">Tas</span></td><td>28x</td><td class="mono fw-bold text-income">Rp 1.400.000</td></tr>
-                                        <tr><td><div class="rank-circle">3</div></td><td class="fw-semibold">Sleeping Bag</td><td><span class="badge-cat tidur">Tidur</span></td><td>25x</td><td class="mono fw-bold text-income">Rp 625.000</td></tr>
-                                        <tr><td><div class="rank-circle">4</div></td><td class="fw-semibold">Kompor Portable</td><td><span class="badge-cat masak">Masak</span></td><td>20x</td><td class="mono fw-bold text-income">Rp 600.000</td></tr>
-                                        <tr><td><div class="rank-circle">5</div></td><td class="fw-semibold">Headlamp LED</td><td><span class="badge-cat penerangan">Penerangan</span></td><td>15x</td><td class="mono fw-bold text-income">Rp 225.000</td></tr>
+                                        <?php 
+                                        $topBarang = Barang::getPopuler(5);
+                                        $hasData = false;
+                                        foreach ($topBarang as $tb) {
+                                            if ((int)$tb['total_sewa'] > 0) { $hasData = true; break; }
+                                        }
+                                        if (!$hasData): ?>
+                                        <tr><td colspan="5" class="text-center text-secondary py-3">Belum ada barang yang disewa</td></tr>
+                                        <?php else: ?>
+                                        <?php foreach ($topBarang as $rank => $item): 
+                                            if ((int)$item['total_sewa'] == 0) continue;
+                                            $r = $rank + 1;
+                                            $katClass = strtolower(str_replace(' ', '', $item['kategori_nama']));
+                                        ?>
+                                        <tr>
+                                            <td><div class="rank-circle"><?= $r ?></div></td>
+                                            <td class="fw-semibold"><?= htmlspecialchars($item['nama']) ?></td>
+                                            <td><span class="badge-cat <?= $katClass ?>"><?= htmlspecialchars($item['kategori_nama']) ?></span></td>
+                                            <td><?= (int)$item['total_sewa'] ?>x</td>
+                                            <td class="mono fw-bold text-income">Rp <?= number_format($item['harga_per_hari'], 0, ',', '.') ?> /hari</td>
+                                        </tr>
+                                        <?php endforeach; ?>
+                                        <?php endif; ?>
                                     </tbody>
                                 </table>
                             </div>
