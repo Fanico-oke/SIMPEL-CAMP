@@ -1559,9 +1559,30 @@ function goToPromo(i) {
 }
 function movePromo(dir) { goToPromo(promoIndex + dir); }
 function copyPromo(code) {
-    navigator.clipboard.writeText(code).then(() => {
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(code).then(() => {
+            showCartToast('Kode promo "' + code + '" disalin!', 0);
+        }).catch(err => {
+            fallbackCopy(code);
+        });
+    } else {
+        fallbackCopy(code);
+    }
+}
+function fallbackCopy(code) {
+    const textArea = document.createElement("textarea");
+    textArea.value = code;
+    textArea.style.position = "fixed";
+    textArea.style.left = "-999999px";
+    document.body.appendChild(textArea);
+    textArea.select();
+    try {
+        document.execCommand('copy');
         showCartToast('Kode promo "' + code + '" disalin!', 0);
-    });
+    } catch (err) {
+        console.error('Fallback: Oops, unable to copy', err);
+    }
+    document.body.removeChild(textArea);
 }
 
 // Auto slide every 5 seconds
