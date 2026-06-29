@@ -293,6 +293,18 @@ switch ($method) {
                     "?page=reservasi&id=$reservasi_id"
                 ]);
 
+                // Buat notifikasi untuk pelanggan
+                $stmtNotifUser = $db->prepare("
+                    INSERT INTO notifikasi (user_id, judul, pesan, tipe, link)
+                    VALUES (?, ?, ?, 'sistem', ?)
+                ");
+                $stmtNotifUser->execute([
+                    $user_id,
+                    'Pesanan Dibuat',
+                    "Reservasi $kode_reservasi Anda berhasil dibuat dan sedang menunggu konfirmasi admin.",
+                    "transaksi.php"
+                ]);
+
                 $db->commit();
 
                 jsonSuccess([
