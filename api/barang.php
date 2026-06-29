@@ -122,6 +122,7 @@ switch ($method) {
             $kategori_id = intval($_POST['kategori_id'] ?? 0);
             $deskripsi = sanitize($_POST['deskripsi'] ?? '');
             $harga_per_hari = floatval($_POST['harga_per_hari'] ?? 0);
+            $harga_denda = floatval($_POST['harga_denda'] ?? 0);
             $stok_total = intval($_POST['stok_total'] ?? 0);
             $status = sanitize($_POST['status'] ?? 'tersedia');
 
@@ -143,12 +144,12 @@ switch ($method) {
 
             try {
                 $stmt = $db->prepare("
-                    INSERT INTO barang (kategori_id, nama, deskripsi, gambar, harga_per_hari, stok_total, stok_tersedia, status)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO barang (kategori_id, nama, deskripsi, gambar, harga_per_hari, harga_denda, stok_total, stok_tersedia, status)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ");
                 $stmt->execute([
                     $kategori_id, $nama, $deskripsi, $gambar,
-                    $harga_per_hari, $stok_total, $stok_total, $status
+                    $harga_per_hari, $harga_denda, $stok_total, $stok_total, $status
                 ]);
 
                 $newId = $db->lastInsertId();
@@ -172,6 +173,7 @@ switch ($method) {
             $kategori_id = intval($_POST['kategori_id'] ?? 0);
             $deskripsi = sanitize($_POST['deskripsi'] ?? '');
             $harga_per_hari = floatval($_POST['harga_per_hari'] ?? 0);
+            $harga_denda = floatval($_POST['harga_denda'] ?? 0);
             $stok_total = intval($_POST['stok_total'] ?? 0);
             $status = sanitize($_POST['status'] ?? 'tersedia');
 
@@ -212,12 +214,12 @@ switch ($method) {
                 $stmt = $db->prepare("
                     UPDATE barang SET
                         kategori_id = ?, nama = ?, deskripsi = ?, gambar = ?,
-                        harga_per_hari = ?, stok_total = ?, stok_tersedia = ?, status = ?
+                        harga_per_hari = ?, harga_denda = ?, stok_total = ?, stok_tersedia = ?, status = ?
                     WHERE id = ?
                 ");
                 $stmt->execute([
                     $kategori_id, $nama, $deskripsi, $gambar,
-                    $harga_per_hari, $stok_total, $stok_tersedia, $status, $id
+                    $harga_per_hari, $harga_denda, $stok_total, $stok_tersedia, $status, $id
                 ]);
 
                 logAktivitas($db, $user['id'], 'Update Barang', "Mengupdate barang: $nama (ID: $id)", 'barang', $id);

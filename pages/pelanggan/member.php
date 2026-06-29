@@ -4,6 +4,7 @@ require_once dirname(__DIR__, 2) . '/config/constants.php';
 require_once dirname(__DIR__, 2) . '/includes/auth.php';
 require_once dirname(__DIR__, 2) . '/classes/MemberLevel.php';
 require_once dirname(__DIR__, 2) . '/classes/Transaksi.php';
+require_once dirname(__DIR__, 2) . '/classes/Pengaturan.php';
 
 if (!isLoggedIn() || $_SESSION['role'] !== 'pelanggan') {
     header('Location: ' . BASE_URL . '/login.php');
@@ -14,18 +15,25 @@ $page_title = 'Member & Poin';
 $current_page = 'member';
 $user_name = isset($_SESSION['nama']) ? $_SESSION['nama'] : 'Pelanggan';
 
+require_once dirname(__DIR__, 2) . '/classes/MemberReward.php';
+require_once dirname(__DIR__, 2) . '/classes/MemberBenefit.php';
+
 // Load member data
 $member = MemberLevel::getByUser($_SESSION['user_id']);
 $user_poin = $member ? (int)$member['poin'] : 0;
 $member_level = $member ? strtolower($member['level']) : 'regular';
 $member_total_trx = $member ? (int)$member['total_transaksi'] : 0;
 
+// Load Dynamic Rewards & Benefits
+$active_rewards = MemberReward::getAll(true);
+$active_benefits = MemberBenefit::getAll(true);
+
 // Tier levels and thresholds (based on transactions)
 $tiers = [
     'regular' => ['name' => 'Regular', 'min' => 0, 'icon' => 'bi-person-fill'],
-    'bronze'  => ['name' => 'Bronze', 'min' => 5, 'icon' => 'bi-award'],
-    'silver'  => ['name' => 'Silver', 'min' => 15, 'icon' => 'bi-star-fill'],
-    'gold'    => ['name' => 'Gold', 'min' => 30, 'icon' => 'bi-gem'],
+    'bronze'  => ['name' => 'Bronze', 'min' => (int)Pengaturan::get('bronze_min_transaksi', '5'), 'icon' => 'bi-award'],
+    'silver'  => ['name' => 'Silver', 'min' => (int)Pengaturan::get('silver_min_transaksi', '15'), 'icon' => 'bi-star-fill'],
+    'gold'    => ['name' => 'Gold', 'min' => (int)Pengaturan::get('gold_min_transaksi', '30'), 'icon' => 'bi-gem'],
 ];
 $tier_keys = array_keys($tiers);
 $current_tier_idx = array_search($member_level, $tier_keys);
@@ -43,23 +51,50 @@ if ($current_tier_idx < count($tier_keys) - 1) {
     $progress_pct = 100;
 }
 
-// Load recent transactions for point history
-$recent_transactions = Transaksi::getByUser($_SESSION['user_id']);
-$history_items = [];
-$running_poin = $user_poin;
-foreach (array_slice($recent_transactions, 0, 6) as $trx) {
-    $trx_poin = (int)floor((float)$trx['total_bayar'] / 10000);
-    if ($trx_poin > 0) {
-        $history_items[] = [
-            'title' => 'Transaksi ' . htmlspecialchars($trx['kode_transaksi'] ?? '#' . $trx['id']),
-            'date' => date('d M Y · H:i', strtotime($trx['created_at'])),
-            'points' => '+' . $trx_poin,
-            'type' => 'earn',
-            'balance' => $running_poin,
-        ];
-        $running_poin -= $trx_poin;
+// Load ALL recent transactions for point history & stats
+$stmtLog = Database::getInstance()->prepare("SELECT * FROM riwayat_poin WHERE user_id = ? ORDER BY tanggal DESC");
+$stmtLog->execute([$_SESSION['user_id']]);
+$riwayatListFull = $stmtLog->fetchAll();
+
+$total_didapat = 0;
+$total_ditukar = 0;
+
+foreach ($riwayatListFull as $hi) {
+    if ($hi['jenis'] === 'masuk') {
+        $total_didapat += (int)$hi['jumlah'];
+    } else {
+        $total_ditukar += (int)$hi['jumlah'];
     }
 }
+
+// Only show last 10 in history timeline
+$riwayatList = array_slice($riwayatListFull, 0, 10);
+$history_items = [];
+$running_poin = $user_poin;
+
+foreach ($riwayatList as $hi) {
+    $type = ($hi['jenis'] === 'masuk') ? 'earn' : 'spend';
+    $sign = ($hi['jenis'] === 'masuk') ? '+' : '-';
+    
+    $history_items[] = [
+        'title' => htmlspecialchars($hi['keterangan']),
+        'date' => date('d M Y · H:i', strtotime($hi['tanggal'])),
+        'points' => $sign . $hi['jumlah'],
+        'type' => $type,
+        'balance' => $running_poin,
+    ];
+    // Reverse running balance for older items
+    if ($hi['jenis'] === 'masuk') {
+        $running_poin -= (int)$hi['jumlah'];
+    } else {
+        $running_poin += (int)$hi['jumlah'];
+    }
+}
+
+// Load Kupon Saya
+$stmtKupon = Database::getInstance()->prepare("SELECT * FROM promo WHERE kode_promo LIKE ? ORDER BY batas_waktu DESC");
+$stmtKupon->execute(["RWD-" . $_SESSION['user_id'] . "-%"]);
+$kupon_saya = $stmtKupon->fetchAll();
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -309,7 +344,6 @@ foreach (array_slice($recent_transactions, 0, 6) as $trx) {
         }
         .tier-connector-fill {
             height: 100%;
-            width: 66%;
             background: linear-gradient(90deg, var(--primary-light), var(--accent-gold));
             border-radius: 3px;
             transition: width 1.2s ease;
@@ -890,14 +924,56 @@ foreach (array_slice($recent_transactions, 0, 6) as $trx) {
             </div>
         </div>
 
-        <!-- ============ 2. TIER ROADMAP ============ -->
+        <!-- ============ 2. STATISTIK POIN ============ -->
+        <div class="row g-3 mb-4 stagger-item">
+            <div class="col-md-4">
+                <div class="mp-card" style="padding: 18px 24px; display: flex; align-items: center; gap: 16px;">
+                    <div style="width: 48px; height: 48px; border-radius: 12px; background: rgba(82, 183, 136, 0.15); color: #2D6A4F; display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">
+                        <i class="bi bi-arrow-down-circle-fill"></i>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.85rem; color: var(--text-muted); font-weight: 600; margin-bottom: 2px;">Total Poin Didapat</div>
+                        <div style="font-family: var(--font-display); font-size: 1.3rem; font-weight: 700; color: var(--text-dark);"><?= number_format($total_didapat, 0, ',', '.') ?> <span style="font-size:0.8rem;color:var(--text-muted);font-weight:500;">pts</span></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="mp-card" style="padding: 18px 24px; display: flex; align-items: center; gap: 16px;">
+                    <div style="width: 48px; height: 48px; border-radius: 12px; background: rgba(220, 38, 38, 0.1); color: #DC2626; display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">
+                        <i class="bi bi-arrow-up-circle-fill"></i>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.85rem; color: var(--text-muted); font-weight: 600; margin-bottom: 2px;">Total Poin Ditukar</div>
+                        <div style="font-family: var(--font-display); font-size: 1.3rem; font-weight: 700; color: var(--text-dark);"><?= number_format($total_ditukar, 0, ',', '.') ?> <span style="font-size:0.8rem;color:var(--text-muted);font-weight:500;">pts</span></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="mp-card" style="padding: 18px 24px; display: flex; align-items: center; gap: 16px; background: linear-gradient(135deg, rgba(212,163,115,0.05), rgba(212,163,115,0.15)); border: 1px solid rgba(212,163,115,0.3);">
+                    <div style="width: 48px; height: 48px; border-radius: 12px; background: linear-gradient(135deg, var(--accent-gold), var(--accent-gold-light)); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">
+                        <i class="bi bi-wallet2"></i>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.85rem; color: #92400E; font-weight: 600; margin-bottom: 2px;">Sisa Poin Saat Ini</div>
+                        <div style="font-family: var(--font-display); font-size: 1.3rem; font-weight: 700; color: #78350F;"><?= number_format($user_poin, 0, ',', '.') ?> <span style="font-size:0.8rem;opacity:0.8;font-weight:500;">pts</span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============ 3. TIER ROADMAP ============ -->
         <div class="mp-card mb-4 stagger-item">
             <div class="mp-card-title">
                 <i class="bi bi-trophy"></i> Perjalanan Tier Anda
             </div>
             <div class="tier-roadmap">
                 <div class="tier-connector">
-                    <div class="tier-connector-fill"></div>
+                    <?php 
+                        $total_gaps = count($tiers) - 1;
+                        $segment_width = 100 / $total_gaps;
+                        $line_width = ($current_tier_idx * $segment_width) + ($progress_pct / 100 * $segment_width);
+                    ?>
+                    <div class="tier-connector-fill" style="width: <?= $line_width ?>%;"></div>
                 </div>
 
                 <?php foreach ($tiers as $tier_key => $tier_info): 
@@ -918,8 +994,9 @@ foreach (array_slice($recent_transactions, 0, 6) as $trx) {
                         <?= $dot_icon ?>
                     </div>
                     <div class="tier-step-name"><?= htmlspecialchars($tier_info['name']) ?></div>
-                    <div class="tier-step-pts"><?= $tier_info['min'] ?> trx</div>
+                    <div class="tier-step-pts">Min. <?= $tier_info['min'] ?> trx</div>
                     <?php if ($tier_idx === $current_tier_idx): ?>
+                    <div style="font-size:0.75rem; color:var(--primary); font-weight:600; margin-top:2px;">(Anda: <?= $member_total_trx ?> trx)</div>
                     <span class="tier-badge-current">
                         <i class="bi bi-geo-alt-fill"></i> Saat Ini
                     </span>
@@ -929,14 +1006,45 @@ foreach (array_slice($recent_transactions, 0, 6) as $trx) {
             </div>
         </div>
 
-        <!-- ============ 3. TWO COLUMN: HISTORY + REWARDS ============ -->
+        <!-- ============ 3. KUPON SAYA ============ -->
+        <div class="section-label mt-2">
+            <i class="bi bi-ticket-perforated"></i> Kupon Saya
+        </div>
+        <div class="row g-3 mb-4 stagger-item">
+            <?php if(empty($kupon_saya)): ?>
+            <div class="col-12">
+                <div class="mp-card text-center py-4" style="border: 1px dashed rgba(0,0,0,0.1);">
+                    <i class="bi bi-ticket" style="font-size:2rem;color:var(--text-muted);opacity:0.4;"></i>
+                    <p class="mt-2 mb-0" style="color:var(--text-muted);font-size:0.9rem;">Anda belum menukarkan reward apapun.</p>
+                </div>
+            </div>
+            <?php else: ?>
+                <?php foreach($kupon_saya as $kpn): ?>
+                <div class="col-md-6 col-lg-4">
+                    <div class="mp-card" style="padding: 16px; border-left: 4px solid var(--accent-gold); display: flex; align-items: center; justify-content: space-between;">
+                        <div>
+                            <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">Kode Promo</div>
+                            <div style="font-family: var(--font-display); font-size: 1.1rem; font-weight: 800; color: var(--text-dark); user-select: all;"><?= htmlspecialchars($kpn['kode_promo']) ?></div>
+                            <div style="font-size: 0.8rem; color: #DC2626; margin-top: 4px;"><i class="bi bi-clock-history"></i> Exp: <?= date('d M Y', strtotime($kpn['batas_waktu'])) ?></div>
+                        </div>
+                        <div style="text-align: right;">
+                            <div style="font-size: 1.1rem; font-weight: 800; color: #2D6A4F;">Rp <?= number_format($kpn['nilai_diskon'], 0, ',', '.') ?></div>
+                            <div style="font-size: 0.75rem; color: var(--text-muted);">Diskon Nominal</div>
+                        </div>
+                    </div>
+                </div>
+                <?php endforeach; ?>
+            <?php endif; ?>
+        </div>
+
+        <!-- ============ 4. TWO COLUMN: HISTORY + REWARDS ============ -->
         <div class="row g-4 mb-4">
 
             <!-- LEFT: Point History Timeline -->
             <div class="col-lg-7">
                 <div class="mp-card h-100 stagger-item">
-                    <div class="mp-card-title">
-                        <i class="bi bi-clock-history"></i> Riwayat Poin
+                    <div class="mp-card-title d-flex justify-content-between align-items-center">
+                        <div><i class="bi bi-clock-history"></i> Riwayat Poin (10 Terakhir)</div>
                     </div>
                     <div class="history-timeline">
                         <?php if (!empty($history_items)): ?>
@@ -970,93 +1078,48 @@ foreach (array_slice($recent_transactions, 0, 6) as $trx) {
                         <i class="bi bi-gift"></i> Tukar Reward
                     </div>
                     <div class="d-flex flex-column gap-3">
-                        <!-- Reward 1: Diskon 10% -->
-                        <div class="reward-card" id="reward-diskon">
-                            <div class="reward-icon discount">
-                                <i class="bi bi-percent"></i>
+                        <?php foreach($active_rewards as $r): ?>
+                        <div class="reward-card" id="reward-<?= $r['id'] ?>">
+                            <div class="reward-icon" style="background:var(--primary-lighter);color:var(--primary);">
+                                <i class="bi <?= htmlspecialchars($r['icon']) ?>"></i>
                             </div>
                             <div class="reward-info">
-                                <div class="r-name">Diskon 10%</div>
-                                <div class="r-cost"><i class="bi bi-star-fill"></i> 100 poin</div>
+                                <div class="r-name"><?= htmlspecialchars($r['nama_reward']) ?></div>
+                                <div class="r-cost"><i class="bi bi-star-fill"></i> <?= $r['poin_dibutuhkan'] ?> poin</div>
+                                <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;"><?= htmlspecialchars($r['deskripsi']) ?></div>
                             </div>
-                            <button class="btn-tukar" onclick="openRedeemModal('Diskon 10%', 100, 'DSK10')">
+                            <button class="btn-tukar <?= $user_poin >= $r['poin_dibutuhkan'] ? '' : 'disabled' ?>" onclick="<?= $user_poin >= $r['poin_dibutuhkan'] ? "openRedeemModal(" . $r['id'] . ", '" . addslashes(htmlspecialchars($r['nama_reward'])) . "', " . $r['poin_dibutuhkan'] . ")" : "alert('Poin Anda tidak cukup')" ?>">
                                 Tukar
                             </button>
                         </div>
-
-                        <!-- Reward 2: Gratis Sleeping Bag -->
-                        <div class="reward-card" id="reward-sleepingbag">
-                            <div class="reward-icon freebie">
-                                <i class="bi bi-moon-stars"></i>
-                            </div>
-                            <div class="reward-info">
-                                <div class="r-name">Gratis Sleeping Bag</div>
-                                <div class="r-cost"><i class="bi bi-star-fill"></i> 200 poin</div>
-                            </div>
-                            <button class="btn-tukar" onclick="openRedeemModal('Gratis Sleeping Bag', 200, 'SLP200')">
-                                Tukar
-                            </button>
-                        </div>
-
-                        <!-- Reward 3: Upgrade Tenda (Locked) -->
-                        <div class="reward-card locked" id="reward-upgrade">
-                            <div class="reward-icon upgrade">
-                                <i class="bi bi-arrow-up-circle"></i>
-                            </div>
-                            <div class="reward-info">
-                                <div class="r-name">Upgrade Tenda</div>
-                                <div class="r-cost"><i class="bi bi-star-fill"></i> 500 poin</div>
-                            </div>
-                            <button class="btn-tukar" disabled>
-                                <i class="bi bi-lock-fill me-1"></i> Terkunci
-                            </button>
-                        </div>
+                        <?php endforeach; ?>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- ============ 4. BENEFITS GRID ============ -->
+        <!-- ============ 5. BENEFITS GRID ============ -->
         <div class="section-label">
             <i class="bi bi-shield-check"></i> Keuntungan Member
         </div>
         <div class="row g-4 mb-4">
+            <?php foreach($active_benefits as $idx => $b): 
+                $req_tier = 'Bronze';
+                if ($idx > 0) $req_tier = 'Silver';
+                if ($idx > 1) $req_tier = 'Gold';
+                if ($idx > 2) $req_tier = 'Platinum';
+            ?>
             <div class="col-md-6 col-lg-3">
-                <div class="benefit-card stagger-item">
-                    <div class="benefit-icon b1">
-                        <i class="bi bi-tag"></i>
+                <div class="mp-card stagger-item h-100" style="padding: 24px; text-align: center; border-top: 4px solid <?= htmlspecialchars($b['warna']) ?>; position: relative;">
+                    <div style="position: absolute; top: 12px; right: 12px; font-size: 0.65rem; background: #F3F4F6; padding: 4px 10px; border-radius: 50px; font-weight: 700; color: #4B5563;">Min. <?= $req_tier ?></div>
+                    <div style="width: 56px; height: 56px; border-radius: 16px; background: <?= htmlspecialchars($b['warna']) ?>; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; margin: 10px auto 16px; box-shadow: 0 8px 20px <?= str_replace(')', ',0.3)', str_replace('rgb', 'rgba', htmlspecialchars($b['warna']))) ?>;">
+                        <i class="bi <?= htmlspecialchars($b['icon']) ?>"></i>
                     </div>
-                    <div class="benefit-name">Diskon Member</div>
-                    <div class="benefit-desc">Dapatkan potongan harga spesial hingga 15% untuk setiap booking.</div>
+                    <div style="font-family: var(--font-display); font-weight: 700; font-size: 1.05rem; color: var(--text-dark); margin-bottom: 8px;"><?= htmlspecialchars($b['nama_benefit']) ?></div>
+                    <div style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.5;"><?= htmlspecialchars($b['deskripsi']) ?></div>
                 </div>
             </div>
-            <div class="col-md-6 col-lg-3">
-                <div class="benefit-card stagger-item">
-                    <div class="benefit-icon b2">
-                        <i class="bi bi-calendar-check"></i>
-                    </div>
-                    <div class="benefit-name">Prioritas Booking</div>
-                    <div class="benefit-desc">Akses lebih awal untuk booking di tanggal-tanggal populer dan libur.</div>
-                </div>
-            </div>
-            <div class="col-md-6 col-lg-3">
-                <div class="benefit-card stagger-item">
-                    <div class="benefit-icon b3">
-                        <i class="bi bi-coin"></i>
-                    </div>
-                    <div class="benefit-name">Poin Reward</div>
-                    <div class="benefit-desc">Kumpulkan poin dari setiap transaksi dan tukar dengan reward menarik.</div>
-                </div>
-            </div>
-            <div class="col-md-6 col-lg-3">
-                <div class="benefit-card stagger-item">
-                    <div class="benefit-icon b4">
-                        <i class="bi bi-headset"></i>
-                    </div>
-                    <div class="benefit-name">Support Prioritas</div>
-                    <div class="benefit-desc">Layanan customer support prioritas dengan respons lebih cepat.</div>
-                </div>
-            </div>
+            <?php endforeach; ?>
         </div>
 
     </div><!-- /.container-fluid -->
@@ -1168,32 +1231,44 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // ===== Redeem Variables =====
-let currentReward = { name: '', cost: 0, code: '' };
+let currentReward = { id: 0, name: '', cost: 0 };
 
-function openRedeemModal(name, cost, codePrefix) {
-    currentReward = { name: name, cost: cost, code: codePrefix };
+function openRedeemModal(id, name, cost) {
+    currentReward = { id: id, name: name, cost: cost };
     document.getElementById('redeemRewardName').textContent = name;
     document.getElementById('redeemRewardCost').textContent = cost;
     const modal = new bootstrap.Modal(document.getElementById('redeemModal'));
     modal.show();
 }
 
-function confirmRedeem() {
+async function confirmRedeem() {
     // Close confirm modal
     const redeemModal = bootstrap.Modal.getInstance(document.getElementById('redeemModal'));
     if (redeemModal) redeemModal.hide();
 
-    // Generate coupon code
-    const randomSuffix = Math.random().toString(36).substring(2, 8).toUpperCase();
-    const couponCode = currentReward.code + '-' + randomSuffix;
-    document.getElementById('couponCodeValue').textContent = couponCode;
+    const payload = { reward_id: currentReward.id };
 
-    // Show success modal after short delay
-    setTimeout(function() {
-        const successModal = new bootstrap.Modal(document.getElementById('successModal'));
-        successModal.show();
-        showToast('success', 'Penukaran Berhasil', currentReward.name + ' telah ditukarkan!');
-    }, 350);
+    try {
+        const response = await fetch('<?= BASE_URL ?>/api/member_reward.php?action=tukar', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const res = await response.json();
+        
+        if (res.status === 'success') {
+            document.getElementById('couponCodeValue').textContent = res.kode_promo;
+            setTimeout(function() {
+                const successModal = new bootstrap.Modal(document.getElementById('successModal'));
+                successModal.show();
+                showToast('success', 'Penukaran Berhasil', currentReward.name + ' telah ditukarkan!');
+            }, 350);
+        } else {
+            showToast('error', 'Penukaran Gagal', res.message || 'Gagal menukar reward');
+        }
+    } catch (e) {
+        showToast('error', 'Error', 'Terjadi kesalahan jaringan.');
+    }
 }
 
 function copyCoupon() {

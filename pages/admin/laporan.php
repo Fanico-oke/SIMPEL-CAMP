@@ -45,23 +45,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 // Stats from database
 $totalRevenue = Transaksi::totalPendapatan();
-$totalBarangSewa = Reservasi::count(['status' => 'selesai']);
+// $totalBarangSewa = Reservasi::count(['status' => 'selesai']);
+// Count actual items rented
+$stmtCountItems = Database::getInstance()->prepare("
+    SELECT COALESCE(SUM(dr.jumlah), 0)
+    FROM detail_reservasi dr
+    JOIN reservasi r ON dr.reservasi_id = r.id
+    WHERE r.status = 'selesai'
+");
+$stmtCountItems->execute();
+$totalBarangSewa = (int)$stmtCountItems->fetchColumn();
 $totalPelangganAktif = User::countByRole('pelanggan');
+
+// Count total transactions this month
+$currentYear = date('Y');
+$currentMonth = (int)date('m');
+$stmtTrx = Database::getInstance()->prepare("SELECT COUNT(*) FROM transaksi WHERE status IN ('selesai','aktif') AND MONTH(created_at) = ? AND YEAR(created_at) = ?");
+$stmtTrx->execute([$currentMonth, $currentYear]);
+$totalTransaksiBulanIni = (int)$stmtTrx->fetchColumn();
 
 // Fetch recent transactions for table
 $laporanTrx = Transaksi::getAll(['limit' => 10]);
 $laporanTotal = 0;
-foreach ($laporanTrx as $lt) { $laporanTotal += ($lt['total_bayar'] ?? 0); }
+foreach ($laporanTrx as $lt) { $laporanTotal += ($lt['total_bayar'] ?? 0) + ($lt['denda'] ?? 0); }
 
 // Monthly revenue data for charts
-$currentYear = date('Y');
-$currentMonth = (int)date('m');
 $monthNames = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
 $monthlyRevenue = [];
 try {
     $db = Database::getInstance();
     $stmt = $db->prepare("
-        SELECT MONTH(created_at) as bulan, COALESCE(SUM(total_bayar), 0) as total
+        SELECT MONTH(created_at) as bulan, COALESCE(SUM(total_bayar + denda), 0) as total
         FROM transaksi
         WHERE status = 'selesai' AND YEAR(created_at) = ?
         GROUP BY MONTH(created_at)
@@ -102,6 +116,21 @@ $expKatOptions = ['Pembelian Stok', 'Perawatan', 'Operasional', 'Lainnya'];
 // Max for hbar chart
 $maxBarVal = max(max(array_column($monthlyRevenue, 'value') ?: [1]), max($monthlyExpense ?: [1]));
 if ($maxBarVal == 0) $maxBarVal = 1;
+
+// Monthly transaction counts
+$trxByMonth = [];
+try {
+    $stmtTrxMonth = $db->prepare("
+        SELECT MONTH(created_at) as bulan, COUNT(*) as jml
+        FROM transaksi
+        WHERE YEAR(created_at) = ? AND status IN ('selesai','aktif')
+        GROUP BY MONTH(created_at)
+    ");
+    $stmtTrxMonth->execute([$currentYear]);
+    while ($rowTrx = $stmtTrxMonth->fetch()) {
+        $trxByMonth[(int)$rowTrx['bulan']] = (int)$rowTrx['jml'];
+    }
+} catch (Exception $e) {}
 
 // Format helper (short format with M/K suffix for charts)
 function formatRupiahShort($n) {
@@ -172,10 +201,10 @@ h1,h2,h3,h4,h5,h6,.heading{font-family:'Outfit',sans-serif}
 
 /* Horizontal Bar Chart */
 .hbar-chart{margin-bottom:24px}
-.hbar-row{display:flex;align-items:center;margin-bottom:14px;gap:10px}
+.hbar-row{display:flex;align-items:center;margin-bottom:8px;gap:10px}
 .hbar-label{width:70px;font-size:.82rem;font-weight:600;color:#6c757d;text-align:right;flex-shrink:0}
-.hbar-bars{flex:1;display:flex;flex-direction:column;gap:4px}
-.hbar{height:22px;border-radius:4px;position:relative;display:flex;align-items:center;padding-left:8px}
+.hbar-bars{flex:1;display:flex;flex-direction:column;gap:3px}
+.hbar{height:18px;border-radius:4px;position:relative;display:flex;align-items:center;padding-left:8px;min-width:2px}
 .hbar.income{background:linear-gradient(90deg,var(--lp-mid),var(--lp-light))}
 .hbar.expense{background:linear-gradient(90deg,#dc2626,#ef4444)}
 .hbar-val{font-size:.7rem;font-family:'JetBrains Mono',monospace;color:#fff;font-weight:600;white-space:nowrap}
@@ -276,7 +305,7 @@ h1,h2,h3,h4,h5,h6,.heading{font-family:'Outfit',sans-serif}
 
             <!-- Stat Cards -->
             <div class="row g-3 mb-4">
-                <div class="col-sm-6 col-lg-4 stagger-item">
+                <div class="col-sm-6 col-lg-3 stagger-item">
                     <div class="stat-card" style="border-left-color:#3b82f6">
                         <div class="d-flex align-items-center gap-3 mb-2">
                             <div class="stat-icon blue"><i class="bi bi-cash-coin"></i></div>
@@ -285,7 +314,7 @@ h1,h2,h3,h4,h5,h6,.heading{font-family:'Outfit',sans-serif}
                         <div class="stat-value"><span class="mono-num">Rp </span><span class="counter mono-num" data-target="<?= (int)$totalRevenue ?>" data-format="currency">0</span></div>
                     </div>
                 </div>
-                <div class="col-sm-6 col-lg-4 stagger-item">
+                <div class="col-sm-6 col-lg-3 stagger-item">
                     <div class="stat-card" style="border-left-color:#8b5cf6">
                         <div class="d-flex align-items-center gap-3 mb-2">
                             <div class="stat-icon purple"><i class="bi bi-box-seam"></i></div>
@@ -294,7 +323,16 @@ h1,h2,h3,h4,h5,h6,.heading{font-family:'Outfit',sans-serif}
                         <div class="stat-value"><span class="counter" data-target="<?= $totalBarangSewa ?>">0</span> <span style="font-size:.9rem;font-weight:500;color:#999">unit</span></div>
                     </div>
                 </div>
-                <div class="col-sm-6 col-lg-4 stagger-item">
+                <div class="col-sm-6 col-lg-3 stagger-item">
+                    <div class="stat-card" style="border-left-color:#D4A373">
+                        <div class="d-flex align-items-center gap-3 mb-2">
+                            <div class="stat-icon" style="background:rgba(212,163,115,0.12);color:#D4A373"><i class="bi bi-receipt"></i></div>
+                            <div class="stat-label">Transaksi Bulan Ini</div>
+                        </div>
+                        <div class="stat-value"><span class="counter" data-target="<?= $totalTransaksiBulanIni ?>">0</span> <span style="font-size:.9rem;font-weight:500;color:#999">trx</span></div>
+                    </div>
+                </div>
+                <div class="col-sm-6 col-lg-3 stagger-item">
                     <div class="stat-card" style="border-left-color:#10b981">
                         <div class="d-flex align-items-center gap-3 mb-2">
                             <div class="stat-icon green"><i class="bi bi-people"></i></div>
@@ -416,7 +454,7 @@ h1,h2,h3,h4,h5,h6,.heading{font-family:'Outfit',sans-serif}
                     <div class="table-responsive">
                         <table class="table align-middle">
                             <thead>
-                                <tr><th>No</th><th>ID Transaksi</th><th>Pelanggan</th><th>Tgl</th><th>Total</th><th>Status</th></tr>
+                                <tr><th>No</th><th>ID Transaksi</th><th>Pelanggan</th><th>Tgl</th><th>Barang Disewa</th><th>Total</th><th>Status</th></tr>
                             </thead>
                             <tbody>
                                 <?php if (empty($laporanTrx)): ?>
@@ -425,13 +463,24 @@ h1,h2,h3,h4,h5,h6,.heading{font-family:'Outfit',sans-serif}
                                 <?php foreach ($laporanTrx as $i => $lt):
                                     $ltStatusMap = ['pending'=>'Menunggu','dibayar'=>'Dibayar','aktif'=>'Aktif','selesai'=>'Selesai','batal'=>'Batal'];
                                     $ltStatusClass = ['pending'=>'pending','dibayar'=>'aktif','aktif'=>'aktif','selesai'=>'selesai','batal'=>'batal'];
+                                    
+                                    // Fetch item details
+                                    $items = [];
+                                    if (!empty($lt['reservasi_id'])) {
+                                        $stmtItems = $db->prepare("SELECT b.nama, dr.jumlah FROM detail_reservasi dr JOIN barang b ON dr.barang_id = b.id WHERE dr.reservasi_id = ?");
+                                        $stmtItems->execute([$lt['reservasi_id']]);
+                                        while ($itemRow = $stmtItems->fetch()) {
+                                            $items[] = htmlspecialchars($itemRow['nama']) . ' (' . $itemRow['jumlah'] . 'x)';
+                                        }
+                                    }
+                                    $itemsStr = !empty($items) ? implode(', ', $items) : '-';
                                 ?>
-                                <tr><td><?= $i+1 ?></td><td class="mono fw-semibold"><?= htmlspecialchars($lt['kode_transaksi'] ?? 'TRX-'.$lt['id']) ?></td><td><?= htmlspecialchars($lt['user_nama'] ?? '-') ?></td><td><?= date('d M Y', strtotime($lt['created_at'])) ?></td><td class="mono fw-bold text-income">Rp <?= number_format($lt['total_bayar'] ?? 0, 0, ',', '.') ?></td><td><span class="badge-status <?= $ltStatusClass[$lt['status']] ?? 'pending' ?>"><?= $ltStatusMap[$lt['status']] ?? ucfirst($lt['status']) ?></span></td></tr>
+                                <tr><td><?= $i+1 ?></td><td class="mono fw-semibold"><?= htmlspecialchars($lt['kode_transaksi'] ?? 'TRX-'.$lt['id']) ?></td><td><?= htmlspecialchars($lt['user_nama'] ?? '-') ?></td><td><?= date('d M Y', strtotime($lt['created_at'])) ?></td><td style="max-width: 200px; white-space: normal; font-size: 0.85rem;"><?= $itemsStr ?></td><td class="mono fw-bold text-income">Rp <?= number_format(($lt['total_bayar'] ?? 0) + ($lt['denda'] ?? 0), 0, ',', '.') ?></td><td><span class="badge-status <?= $ltStatusClass[$lt['status']] ?? 'pending' ?>"><?= $ltStatusMap[$lt['status']] ?? ucfirst($lt['status']) ?></span></td></tr>
                                 <?php endforeach; ?>
                                 <?php endif; ?>
                             </tbody>
                             <tfoot>
-                                <tr><td colspan="4" class="fw-bold">TOTAL PENDAPATAN</td><td class="mono fw-bold text-income">Rp <?= number_format($laporanTotal, 0, ',', '.') ?></td><td></td></tr>
+                                <tr><td colspan="5" class="fw-bold">TOTAL PENDAPATAN</td><td class="mono fw-bold text-income">Rp <?= number_format($laporanTotal, 0, ',', '.') ?></td><td></td></tr>
                             </tfoot>
                         </table>
                     </div>
@@ -520,7 +569,7 @@ h1,h2,h3,h4,h5,h6,.heading{font-family:'Outfit',sans-serif}
                     <div class="table-responsive">
                         <table class="table align-middle">
                             <thead>
-                                <tr><th>Bulan</th><th>Pemasukan</th><th>Tren</th></tr>
+                                <tr><th>Bulan</th><th>Jml Transaksi</th><th>Pemasukan</th><th>Tren</th></tr>
                             </thead>
                             <tbody>
                                 <?php 
@@ -530,21 +579,31 @@ h1,h2,h3,h4,h5,h6,.heading{font-family:'Outfit',sans-serif}
                                 foreach ($monthlyRevenue as $i => $mr):
                                     $grandTotal += $mr['value'];
                                     $tren = '';
-                                    if ($i > 0 && $prevValue > 0) {
-                                        $change = (($mr['value'] - $prevValue) / $prevValue) * 100;
-                                        if ($change >= 0) {
-                                            $tren = '<i class="bi bi-arrow-up text-success"></i> +' . round($change, 1) . '%';
+                                    if ($i > 0) {
+                                        if ($prevValue > 0) {
+                                            $change = (($mr['value'] - $prevValue) / $prevValue) * 100;
+                                            if ($change > 0) {
+                                                $tren = '<i class="bi bi-arrow-up text-success"></i> +' . round($change, 1) . '%';
+                                            } elseif ($change < 0) {
+                                                $tren = '<i class="bi bi-arrow-down text-danger"></i> ' . round($change, 1) . '%';
+                                            } else {
+                                                $tren = '<span class="text-muted">-</span>';
+                                            }
+                                        } elseif ($mr['value'] > 0) {
+                                            // Bulan sebelumnya 0, sekarang ada pemasukan -> tren naik 100%
+                                            $tren = '<i class="bi bi-arrow-up text-success"></i> +100%';
                                         } else {
-                                            $tren = '<i class="bi bi-arrow-down text-danger"></i> ' . round($change, 1) . '%';
+                                            $tren = '<span class="text-muted">-</span>';
                                         }
-                                    } elseif ($i === 0) {
-                                        $tren = '<i class="bi bi-arrow-up text-success"></i>';
+                                    } else {
+                                        $tren = '<span class="text-muted">-</span>';
                                     }
                                     $prevValue = $mr['value'];
                                     $mIdx = array_search($mr['month'], $monthNames);
                                 ?>
                                 <tr>
                                     <td class="fw-semibold"><?= $fullMonthNames[$mIdx] ?? $mr['month'] ?></td>
+                                    <td class="mono"><?= $trxByMonth[$mIdx + 1] ?? 0 ?> transaksi</td>
                                     <td class="mono text-income"><?= formatRupiahShort($mr['value']) ?></td>
                                     <td><?= $tren ?></td>
                                 </tr>
@@ -553,6 +612,7 @@ h1,h2,h3,h4,h5,h6,.heading{font-family:'Outfit',sans-serif}
                             <tfoot>
                                 <tr>
                                     <td class="fw-bold">TOTAL</td>
+                                    <td class="mono fw-bold"><?= array_sum($trxByMonth) ?> transaksi</td>
                                     <td class="mono fw-bold text-income"><?= formatRupiahShort($grandTotal) ?></td>
                                     <td><i class="bi bi-graph-up-arrow text-success fw-bold"></i></td>
                                 </tr>
@@ -585,7 +645,7 @@ h1,h2,h3,h4,h5,h6,.heading{font-family:'Outfit',sans-serif}
                                 <?php endif; ?>
                             </tbody>
                             <tfoot>
-                                <tr><td colspan="3" class="fw-bold">TOTAL PENGELUARAN</td><td class="mono fw-bold text-expense">Rp <?= number_format($totalPengeluaran, 0, ',', '.') ?></td><td class="fw-bold">100%</td></tr>
+                                <tr><td colspan="3" class="fw-bold">TOTAL PENGELUARAN</td><td class="mono fw-bold text-expense">Rp <?= number_format($totalPengeluaran, 0, ',', '.') ?></td><td class="fw-bold"><?= $totalPengeluaran > 0 ? '100%' : '0%' ?></td></tr>
                             </tfoot>
                         </table>
                     </div>

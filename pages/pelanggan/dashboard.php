@@ -857,8 +857,21 @@ body {
 
             </div>
 
+            <!-- Info Point System Banner -->
+            <div style="background: linear-gradient(135deg, rgba(212,163,115,0.15), rgba(233,196,106,0.1)); border: 1px solid rgba(212,163,115,0.3); border-radius: 16px; padding: 16px 20px; margin-bottom: 24px; display: flex; align-items: flex-start; gap: 14px; animation: slideUp 0.5s ease backwards 0.3s;">
+                <div style="width: 40px; height: 40px; min-width: 40px; background: #D4A373; color: white; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem;">
+                    <i class="bi bi-star-fill"></i>
+                </div>
+                <div>
+                    <h5 style="margin: 0 0 4px 0; font-family: var(--font-heading); color: #92400E; font-size: 0.95rem; font-weight: 700;">Info Poin & Reward</h5>
+                    <p style="margin: 0; font-size: 0.85rem; color: #78350F; line-height: 1.5;">
+                        Dapatkan <strong>1 Poin</strong> setiap transaksi kelipatan <strong>Rp 10.000</strong>. Tukarkan poin Anda dengan diskon eksklusif di menu <a href="<?= BASE_URL ?>/pages/pelanggan/member.php" style="color: #92400E; font-weight: 600; text-decoration: underline;">Member & Poin</a>!
+                    </p>
+                </div>
+            </div>
+
             <!-- Two Column Section -->
-            <div class="two-col-section animate-in delay-3">
+            <div class="two-col-section mt-4 animate-in delay-3">
 
                 <!-- Jadwal Sewa -->
                 <div class="dash-card">

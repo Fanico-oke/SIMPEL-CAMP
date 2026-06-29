@@ -20,6 +20,18 @@ foreach ($barangList as $b) {
 }
 $adminName = $_SESSION['nama'] ?? 'Admin';
 
+// Fetch pengaturan denda
+$db = Database::getInstance();
+$stmtSet = $db->query("SELECT `key`, `value` FROM pengaturan WHERE `key` IN ('denda_rusak_ringan_persen', 'denda_rusak_berat_persen', 'denda_hilang_persen', 'denda_per_hari_persen')");
+$settings = [];
+while ($row = $stmtSet->fetch()) {
+    $settings[$row['key']] = floatval($row['value']);
+}
+$denda_ringan = $settings['denda_rusak_ringan_persen'] ?? 25;
+$denda_berat  = $settings['denda_rusak_berat_persen'] ?? 50;
+$denda_hilang = $settings['denda_hilang_persen'] ?? 100;
+$denda_telat  = $settings['denda_per_hari_persen'] ?? 10;
+
 $fallbackImages = [
     'https://images.unsplash.com/photo-1504280390367-361c6d9f38f4?w=400',
     'https://images.unsplash.com/photo-1622260614153-03f8c8e3e5d4?w=400',
@@ -127,6 +139,18 @@ h1,h2,h3,h4,h5,h6,.heading{font-family:'Outfit',sans-serif}
 
 /* Icon Preview */
 .icon-preview-box{width:56px;height:56px;border-radius:14px;background:rgba(82,183,136,0.1);display:flex;align-items:center;justify-content:center;font-size:1.6rem;color:var(--kb-mid)}
+
+/* Drag & Drop File Upload */
+.dropzone-area { border: 2px dashed #cbd5e1; border-radius: 12px; padding: 24px; text-align: center; transition: all 0.3s; background: #f8fafc; cursor: pointer; position: relative; overflow: hidden; min-height: 160px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.dropzone-area:hover, .dropzone-area.dragover { border-color: var(--kb-light); background: rgba(82,183,136,0.05); }
+.dropzone-area i { font-size: 2rem; color: #94a3b8; margin-bottom: 8px; transition: color 0.3s; }
+.dropzone-area:hover i { color: var(--kb-light); }
+.dropzone-area .dropzone-text { font-size: 0.9rem; color: #64748b; font-weight: 500; }
+.dropzone-area input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; z-index: 10; }
+.dropzone-area img { max-width: 100%; max-height: 200px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); z-index: 5; }
+.dropzone-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; color: white; opacity: 0; transition: opacity 0.3s; z-index: 6; border-radius: 12px; font-weight: 600; }
+.dropzone-area:hover .dropzone-overlay { opacity: 1; }
+.dropzone-remove { margin-top: 8px; font-size: 0.8rem; color: #ef4444; cursor: pointer; font-weight: 600; display: inline-block; z-index: 11; position: relative; }
 
 /* Detail Modal */
 .detail-img{width:100%;height:260px;object-fit:cover;border-radius:12px;margin-bottom:16px}
@@ -246,8 +270,22 @@ h1,h2,h3,h4,h5,h6,.heading{font-family:'Outfit',sans-serif}
         <input type="hidden" id="barangId">
         <div class="row g-3">
             <div class="col-12">
-                <label class="form-label">URL Gambar</label>
-                <input type="url" class="form-control" id="barangImage" placeholder="https://images.unsplash.com/...">
+                <label class="form-label">Foto Barang</label>
+                <div class="dropzone-area" id="dropzoneArea" onclick="document.getElementById('barangGambar').click()">
+                    <div id="dropzoneContent">
+                        <i class="bi bi-cloud-arrow-up"></i>
+                        <div class="dropzone-text">Tarik & Lepas foto ke sini atau klik untuk memilih</div>
+                        <div class="text-muted mt-1" style="font-size: 0.75rem;">Maksimal 2MB (JPG, PNG, WebP)</div>
+                    </div>
+                    <img src="" id="imgPreview" alt="Preview" style="display:none;">
+                    <div class="dropzone-overlay" id="dropzoneOverlay" style="display:none;">
+                        <i class="bi bi-pencil-square me-2" style="color:white;"></i> Ganti Foto
+                    </div>
+                    <input type="file" id="barangGambar" accept="image/jpeg, image/png, image/webp" onchange="previewImage(this)">
+                </div>
+                <div class="text-center" id="removePhotoWrapper" style="display:none;">
+                    <span class="dropzone-remove" onclick="removeImage(event)"><i class="bi bi-trash me-1"></i>Hapus Foto</span>
+                </div>
             </div>
             <div class="col-md-6">
                 <label class="form-label">Nama Barang</label>
@@ -264,7 +302,22 @@ h1,h2,h3,h4,h5,h6,.heading{font-family:'Outfit',sans-serif}
             </div>
             <div class="col-md-6">
                 <label class="form-label">Harga / Hari (Rp)</label>
-                <input type="number" class="form-control mono" id="barangHarga" placeholder="0">
+                <input type="number" class="form-control mono" id="barangHarga" placeholder="0" oninput="calculateLiveDenda()">
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Harga Dasar / Nilai Ganti (Rp)</label>
+                <input type="number" class="form-control mono" id="barangHargaDenda" placeholder="0" oninput="calculateLiveDenda()">
+            </div>
+            <div class="col-12" id="liveDendaPreview" style="display:none;">
+                <div class="p-3" style="background:#fff4f4; border-radius:12px; border:1px solid #ffcdd2;">
+                    <h6 class="fw-bold mb-2" style="color:#d32f2f; font-size:0.85rem;"><i class="bi bi-info-circle me-1"></i>Rincian Denda Barang</h6>
+                    <div class="row g-2" style="font-size:0.8rem;">
+                        <div class="col-6"><span class="text-muted">Terlambat:</span> <strong class="mono" id="liveDendaTelat">Rp 0</strong><span class="text-muted">/hr</span></div>
+                        <div class="col-6"><span class="text-muted">Rusak Ringan:</span> <strong class="mono" id="liveDendaRingan">Rp 0</strong></div>
+                        <div class="col-6"><span class="text-muted">Rusak Berat:</span> <strong class="mono" id="liveDendaBerat">Rp 0</strong></div>
+                        <div class="col-6"><span class="text-muted">Hilang:</span> <strong class="mono text-danger" id="liveDendaHilang">Rp 0</strong></div>
+                    </div>
+                </div>
             </div>
             <div class="col-md-6">
                 <label class="form-label">Stok</label>
@@ -373,6 +426,12 @@ h1,h2,h3,h4,h5,h6,.heading{font-family:'Outfit',sans-serif}
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 const BASE_URL = '<?= BASE_URL ?>';
+const DENDA_SETTINGS = {
+    telat: <?= $denda_telat ?>,
+    ringan: <?= $denda_ringan ?>,
+    berat: <?= $denda_berat ?>,
+    hilang: <?= $denda_hilang ?>
+};
 
 // ── Data from Database ──
 const barangData = <?= json_encode(array_reduce($barangList, function($carry, $item) use ($fallbackImages) {
@@ -384,6 +443,7 @@ const barangData = <?= json_encode(array_reduce($barangList, function($carry, $i
         'category' => $item['kategori_nama'] ?? '-',
         'category_id' => $item['kategori_id'] ?? 0,
         'price' => (int)($item['harga_per_hari'] ?? 0),
+        'denda' => (int)($item['harga_denda'] ?? 0),
         'stock' => (int)($item['stok_tersedia'] ?? 0),
         'image' => !empty($item['gambar']) ? ASSETS_URL . '/img/barang/' . $item['gambar'] : $fallbackImages[$idx % count($fallbackImages)],
         'desc' => $item['deskripsi'] ?? '-',
@@ -446,18 +506,46 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('barangStatus').addEventListener('change', function() {
         document.getElementById('statusLabel').textContent = this.checked ? 'Aktif' : 'Nonaktif';
     });
+
+    // Drag & drop logic
+    const dropzone = document.getElementById('dropzoneArea');
+    const fileInput = document.getElementById('barangGambar');
+
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        dropzone.addEventListener(eventName, preventDefaults, false);
+    });
+    function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+    ['dragenter', 'dragover'].forEach(eventName => {
+        dropzone.addEventListener(eventName, () => dropzone.classList.add('dragover'), false);
+    });
+    ['dragleave', 'drop'].forEach(eventName => {
+        dropzone.addEventListener(eventName, () => dropzone.classList.remove('dragover'), false);
+    });
+    dropzone.addEventListener('drop', (e) => {
+        let dt = e.dataTransfer;
+        let files = dt.files;
+        if(files.length > 0) {
+            fileInput.files = files;
+            previewImage(fileInput);
+        }
+    }, false);
 });
 
 function openAddBarang() {
     document.getElementById('modalBarangTitle').innerHTML = '<i class="bi bi-plus-circle me-2"></i>Tambah Barang';
     document.getElementById('barangId').value = '';
-    document.getElementById('barangImage').value = '';
+    removeImage(new Event('click')); // Reset image
     document.getElementById('barangNama').value = '';
     document.getElementById('barangKategori').value = '';
     document.getElementById('barangHarga').value = '';
+    document.getElementById('barangHargaDenda').value = '';
     document.getElementById('barangStok').value = '';
     document.getElementById('barangDeskripsi').value = '';
     document.getElementById('barangStatus').checked = true;
+    calculateLiveDenda();
     modalBarangBS.show();
 }
 
@@ -466,13 +554,25 @@ function openEditBarang(id) {
     if (!item) return;
     document.getElementById('modalBarangTitle').innerHTML = '<i class="bi bi-pencil me-2"></i>Edit Barang';
     document.getElementById('barangId').value = id;
-    document.getElementById('barangImage').value = item.image;
+    
+    // Set existing image
+    removeImage(new Event('click'));
+    if (item.has_image) {
+        document.getElementById('dropzoneContent').style.display = 'none';
+        document.getElementById('imgPreview').style.display = 'block';
+        document.getElementById('imgPreview').src = item.image;
+        document.getElementById('dropzoneOverlay').style.display = 'flex';
+        document.getElementById('removePhotoWrapper').style.display = 'block';
+    }
+
     document.getElementById('barangNama').value = item.name;
     document.getElementById('barangKategori').value = item.category_id || '';
     document.getElementById('barangHarga').value = item.price;
+    document.getElementById('barangHargaDenda').value = item.denda;
     document.getElementById('barangStok').value = item.stock;
     document.getElementById('barangDeskripsi').value = item.desc;
     document.getElementById('barangStatus').checked = true;
+    calculateLiveDenda();
     modalBarangBS.show();
 }
 
@@ -494,9 +594,15 @@ function saveBarang() {
     fd.append('nama', nama);
     fd.append('kategori_id', kategoriId);
     fd.append('harga_per_hari', harga);
+    fd.append('harga_denda', document.getElementById('barangHargaDenda').value || '0');
     fd.append('stok_total', document.getElementById('barangStok').value || '0');
     fd.append('deskripsi', document.getElementById('barangDeskripsi').value);
     fd.append('status', document.getElementById('barangStatus').checked ? 'tersedia' : 'maintenance');
+
+    const fileInput = document.getElementById('barangGambar');
+    if (fileInput.files.length > 0) {
+        fd.append('gambar', fileInput.files[0]);
+    }
 
     fetch(BASE_URL + '/api/barang.php?action=' + action, { method: 'POST', body: fd })
     .then(r => r.json()).then(res => {
@@ -547,13 +653,32 @@ function deleteBarang() {
 function openDetailBarang(id) {
     const item = barangData[id];
     if (!item) return;
+
+    const dendaRingan = item.denda * (DENDA_SETTINGS.ringan / 100);
+    const dendaBerat = item.denda * (DENDA_SETTINGS.berat / 100);
+    const dendaHilang = item.denda * (DENDA_SETTINGS.hilang / 100);
+    const dendaTelat = item.price * (DENDA_SETTINGS.telat / 100);
+
     document.getElementById('detailContent').innerHTML = `
         <img src="${item.image}" class="detail-img" alt="${item.name}">
         <h5 class="heading fw-bold">${item.name}</h5>
         <div class="detail-info-row"><span class="detail-label">Kategori</span><span class="badge-category">${item.category}</span></div>
-        <div class="detail-info-row"><span class="detail-label">Harga / Hari</span><span class="detail-value mono" style="color:var(--kb-mid)">Rp ${item.price.toLocaleString('id-ID')}</span></div>
+        <div class="detail-info-row"><span class="detail-label">Harga Sewa / Hari</span><span class="detail-value mono" style="color:var(--kb-mid)">Rp ${item.price.toLocaleString('id-ID')}</span></div>
         <div class="detail-info-row"><span class="detail-label">Stok</span><span class="badge-stock ${item.stock > 0 ? 'available' : 'empty'}">${item.stock > 0 ? 'Stok: ' + item.stock : 'Habis'}</span></div>
         <div class="detail-info-row"><span class="detail-label">Deskripsi</span><span class="detail-value" style="max-width:60%;text-align:right">${item.desc}</span></div>
+        
+        <div class="mt-4 p-3" style="background:#fff4f4; border-radius:12px; border:1px solid #ffcdd2;">
+            <h6 class="fw-bold mb-3" style="color:#d32f2f; font-family:'Outfit',sans-serif;">
+                <i class="bi bi-exclamation-triangle me-2"></i>Informasi Denda Barang
+            </h6>
+            <div class="detail-info-row border-0 py-1"><span class="detail-label text-dark">Harga Dasar (Nilai Ganti)</span><span class="detail-value mono text-danger">Rp ${item.denda.toLocaleString('id-ID')}</span></div>
+            <hr class="my-2" style="border-color:#ffcdd2">
+            <div class="detail-info-row border-0 py-1"><span class="detail-label">Terlambat (${DENDA_SETTINGS.telat}% harga sewa/hari)</span><span class="detail-value mono" style="font-size:0.9rem">Rp ${dendaTelat.toLocaleString('id-ID')} / hari</span></div>
+            <div class="detail-info-row border-0 py-1"><span class="detail-label">Rusak Ringan (${DENDA_SETTINGS.ringan}% harga ganti)</span><span class="detail-value mono" style="font-size:0.9rem">Rp ${dendaRingan.toLocaleString('id-ID')}</span></div>
+            <div class="detail-info-row border-0 py-1"><span class="detail-label">Rusak Berat (${DENDA_SETTINGS.berat}% harga ganti)</span><span class="detail-value mono" style="font-size:0.9rem">Rp ${dendaBerat.toLocaleString('id-ID')}</span></div>
+            <div class="detail-info-row border-0 py-1"><span class="detail-label fw-bold">Hilang (${DENDA_SETTINGS.hilang}% harga ganti)</span><span class="detail-value mono fw-bold text-danger">Rp ${dendaHilang.toLocaleString('id-ID')}</span></div>
+            <div class="mt-2 text-muted" style="font-size:0.75rem;">*Denda kerusakan dihitung dari harga dasar (nilai ganti) barang.</div>
+        </div>
     `;
     modalDetailBS.show();
 }
@@ -647,6 +772,45 @@ function deleteKategori(id, name) {
 function updateIconPreview() {
     const icon = document.getElementById('kategoriIcon').value;
     document.getElementById('iconPreview').innerHTML = `<i class="bi ${icon}"></i>`;
+}
+
+// Image Preview logic
+function previewImage(input) {
+    if (input.files && input.files[0]) {
+        var reader = new FileReader();
+        reader.onload = function(e) {
+            document.getElementById('dropzoneContent').style.display = 'none';
+            document.getElementById('imgPreview').style.display = 'block';
+            document.getElementById('imgPreview').src = e.target.result;
+            document.getElementById('dropzoneOverlay').style.display = 'flex';
+            document.getElementById('removePhotoWrapper').style.display = 'block';
+        }
+        reader.readAsDataURL(input.files[0]);
+    }
+}
+function removeImage(e) {
+    if (e) e.stopPropagation();
+    document.getElementById('barangGambar').value = '';
+    document.getElementById('imgPreview').style.display = 'none';
+    document.getElementById('imgPreview').src = '';
+    document.getElementById('dropzoneOverlay').style.display = 'none';
+    document.getElementById('dropzoneContent').style.display = 'block';
+    document.getElementById('removePhotoWrapper').style.display = 'none';
+}
+
+function calculateLiveDenda() {
+    const harga = parseFloat(document.getElementById('barangHarga').value) || 0;
+    const ganti = parseFloat(document.getElementById('barangHargaDenda').value) || 0;
+    
+    if (harga > 0 || ganti > 0) {
+        document.getElementById('liveDendaPreview').style.display = 'block';
+        document.getElementById('liveDendaTelat').textContent = 'Rp ' + (harga * (DENDA_SETTINGS.telat / 100)).toLocaleString('id-ID');
+        document.getElementById('liveDendaRingan').textContent = 'Rp ' + (ganti * (DENDA_SETTINGS.ringan / 100)).toLocaleString('id-ID');
+        document.getElementById('liveDendaBerat').textContent = 'Rp ' + (ganti * (DENDA_SETTINGS.berat / 100)).toLocaleString('id-ID');
+        document.getElementById('liveDendaHilang').textContent = 'Rp ' + (ganti * (DENDA_SETTINGS.hilang / 100)).toLocaleString('id-ID');
+    } else {
+        document.getElementById('liveDendaPreview').style.display = 'none';
+    }
 }
 </script>
 </body></html>

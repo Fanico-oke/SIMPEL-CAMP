@@ -14,6 +14,7 @@ if (!isLoggedIn() || $_SESSION['role'] !== 'pelanggan') {
 $page_title = 'Nota Transaksi';
 $current_page = 'transaksi';
 $user_name = isset($_SESSION['nama']) ? $_SESSION['nama'] : 'Pelanggan';
+$is_embed = isset($_GET['embed']) && $_GET['embed'] == '1';
 
 // Load transaction from URL param
 $transaksi_id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
@@ -61,7 +62,7 @@ $inv = [
     'status' => $status_map[$transaksi['status']] ?? ucfirst($transaksi['status']),
     'tgl_sewa' => $tgl_mulai ? date('d M Y', strtotime($tgl_mulai)) : '-',
     'tgl_kembali' => $tgl_selesai ? date('d M Y', strtotime($tgl_selesai)) : '-',
-    'tgl_bayar' => $pembayaran ? date('d M Y', strtotime($pembayaran['created_at'])) : date('d M Y', strtotime($transaksi['created_at'])),
+    'tgl_bayar' => $pembayaran && !empty($pembayaran['created_at']) ? date('d M Y', strtotime($pembayaran['created_at'])) : date('d M Y', strtotime($transaksi['created_at'] ?? $tgl_mulai ?? 'now')),
     'diskon' => 0,
     'deposit' => (int)($transaksi['deposit'] ?? 0),
     'items' => [],
@@ -97,7 +98,6 @@ if (empty($inv['items'])) {
 // Calculate diskon from reservasi if available
 $reservasi_data = Reservasi::getById($reservasi_id);
 if ($reservasi_data && (float)$reservasi_data['diskon'] > 0) {
-    // Calculate diskon percentage from amount
     $subtotal_raw = 0;
     foreach ($inv['items'] as $item) {
         $subtotal_raw += $item['harga'] * $item['qty'] * $item['durasi'];
@@ -107,10 +107,64 @@ if ($reservasi_data && (float)$reservasi_data['diskon'] > 0) {
     }
 }
 
+// Use database total as the source of truth
+$db_total = (int)$transaksi['total_bayar'];
+$subtotal_calc = 0;
+foreach ($inv['items'] as $item) {
+    $subtotal_calc += $item['harga'] * $item['qty'] * $item['durasi'];
+}
+
+// If calculated subtotal doesn't match DB, the harga_satuan already includes duration
+// In that case, keep items as-is but set durasi display to actual duration
+// and recalculate subtotal to match DB total
+if ($subtotal_calc != $db_total && $db_total > 0) {
+    // harga_satuan in DB already includes duration multiplication
+    // So we display: harga per hari = harga_satuan / durasi, durasi = actual, subtotal = harga_satuan * qty
+    $inv['items'] = [];
+    foreach ($detail_items as $detail) {
+        $harga_satuan = (int)$detail['harga_satuan'];
+        $qty = (int)$detail['jumlah'];
+        // Check if harga_satuan already includes duration
+        if ($durasi > 1) {
+            $harga_per_hari = round($harga_satuan / $durasi);
+            // Verify: if harga_per_hari * durasi ≈ harga_satuan, then harga includes duration
+            if (abs($harga_per_hari * $durasi - $harga_satuan) <= 1) {
+                $inv['items'][] = [
+                    'nama' => $detail['barang_nama'],
+                    'harga' => $harga_per_hari,
+                    'qty' => $qty,
+                    'durasi' => $durasi,
+                ];
+            } else {
+                // harga_satuan does NOT include duration, use as-is
+                $inv['items'][] = [
+                    'nama' => $detail['barang_nama'],
+                    'harga' => $harga_satuan,
+                    'qty' => $qty,
+                    'durasi' => 1,
+                ];
+            }
+        } else {
+            $inv['items'][] = [
+                'nama' => $detail['barang_nama'],
+                'harga' => $harga_satuan,
+                'qty' => $qty,
+                'durasi' => 1,
+            ];
+        }
+    }
+}
+
 $subtotal = 0;
 foreach ($inv['items'] as $item) {
     $subtotal += $item['harga'] * $item['qty'] * $item['durasi'];
 }
+
+// Final safety: if subtotal still doesn't match DB, force DB total
+if (abs($subtotal - $db_total) > 1 && $db_total > 0) {
+    $subtotal = $db_total;
+}
+
 $diskon_amount = $subtotal * $inv['diskon'] / 100;
 $grand_total = $subtotal - $diskon_amount;
 ?>
@@ -130,6 +184,15 @@ $grand_total = $subtotal - $diskon_amount;
     <link rel="stylesheet" href="<?= ASSETS_URL ?>/css/dashboard.css?v=1781550666">
     <link rel="stylesheet" href="<?= ASSETS_URL ?>/css/pelanggan-system.css">
     <style>
+        /* embed mode: hide everything except the invoice */
+        <?php if ($is_embed): ?>
+        .pelanggan-wrapper { padding:0 !important; display:block !important; }
+        .pelanggan-sidebar, .sidebar-backdrop, .pelanggan-topbar, .pelanggan-topbar.glass-theme, .nota-toolbar { display:none !important; }
+        .pelanggan-main { margin-left:0 !important; padding:0 !important; width:100% !important; }
+        .pelanggan-content { padding:10px !important; max-width:100% !important; }
+        body { background:#fff !important; overflow-y:auto !important; margin:0 !important; padding:0 !important; }
+        .nota-invoice-card { margin:0 auto !important; box-shadow:none !important; }
+        <?php endif; ?>
         /* â”€â”€ NOTA PAGE STYLES â”€â”€ */
         :root {
             --nota-primary: #2D6A4F;
@@ -793,12 +856,17 @@ $grand_total = $subtotal - $diskon_amount;
 <body>
 
 <div class="pelanggan-wrapper">
-    <?php include dirname(__DIR__, 2) . '/includes/sidebar_pelanggan.php'; ?>
+    <?php if (!$is_embed): ?>
+        <?php include dirname(__DIR__, 2) . '/includes/sidebar_pelanggan.php'; ?>
+    <?php endif; ?>
     <div class="pelanggan-main">
-        <?php $_header_role = 'pelanggan'; include dirname(__DIR__, 2) . '/includes/header_glass.php'; ?>
-        <div class="pelanggan-content">
+        <?php if (!$is_embed): ?>
+            <?php $_header_role = 'pelanggan'; include dirname(__DIR__, 2) . '/includes/header_glass.php'; ?>
+        <?php endif; ?>
+        <div class="pelanggan-content" <?= $is_embed ? 'style="padding:10px !important; margin:0;"' : '' ?>>
 
-            <!-- â•â•â•â•â•â•â•â•â•â• PRINT TOOLBAR â•â•â•â•â•â•â•â•â•â• -->
+            <?php if (!$is_embed): ?>
+            <!-- â• â• â• â• â• â• â• â• â• â•  PRINT TOOLBAR â• â• â• â• â• â• â• â• â• â•  -->
             <div class="nota-toolbar no-print">
                 <a href="<?= BASE_URL ?>/pages/pelanggan/transaksi.php" class="nota-btn nota-btn-back">
                     <i class="bi bi-arrow-left"></i> Kembali
@@ -811,11 +879,12 @@ $grand_total = $subtotal - $diskon_amount;
                     <i class="bi bi-download"></i> Download
                 </button>
                 <button class="nota-btn nota-btn-print" id="btnPrint" onclick="window.print()">
-                    <i class="bi bi-printer"></i> Print
+                    <i class="bi bi-printer"></i> Cetak
                 </button>
             </div>
+            <?php endif; ?>
 
-            <!-- â•â•â•â•â•â•â•â•â•â• INVOICE CARD â•â•â•â•â•â•â•â•â•â• -->
+            <!-- â• â• â• â• â• â• â• â• â• â•  INVOICE CARD â• â• â• â• â• â• â• â• â• â•  -->
             <div class="nota-invoice-card" id="invoiceCard">
 
                 <!-- â”€â”€ HEADER â”€â”€ -->
@@ -900,7 +969,7 @@ $grand_total = $subtotal - $diskon_amount;
                                     </td>
                                     <td><span class="nota-item-price">Rp <?= number_format($item['harga'], 0, ',', '.') ?></span></td>
                                     <td><?= $item['qty'] ?></td>
-                                    <td><?= $item['durasi'] ?> hari</td>
+                                    <td><?= $durasi ?> hari</td>
                                     <td>Rp <?= number_format($item_total, 0, ',', '.') ?></td>
                                 </tr>
                                 <?php endforeach; ?>
@@ -960,19 +1029,19 @@ $grand_total = $subtotal - $diskon_amount;
                         </ul>
                     </div>
 
-                    <!-- Signatures -->
-                    <div class="nota-signatures">
-                        <div class="nota-sig-block">
-                            <div class="nota-sig-label">Penyewa</div>
-                            <div class="nota-sig-line"></div>
-                            <div class="nota-sig-name"><?= htmlspecialchars($inv['nama']) ?></div>
-                        </div>
-                        <div class="nota-sig-block">
-                            <div class="nota-sig-label">Petugas</div>
-                            <div class="nota-sig-line"></div>
-                            <div class="nota-sig-name">SIMPEL-CAMP</div>
+                    <!-- Points Info -->
+                    <?php 
+                    $poinDapat = floor($db_total / 10000); 
+                    if ($poinDapat > 0): 
+                    ?>
+                    <div style="background: rgba(139, 92, 246, 0.08); border-radius: 8px; padding: 12px; margin-top: 20px; display: flex; align-items: center; gap: 10px; color: #6D28D9; border: 1px solid rgba(139, 92, 246, 0.2);">
+                        <i class="bi bi-star-fill" style="font-size: 1.2rem;"></i>
+                        <div>
+                            <strong style="display: block; font-size: 0.9rem;">Selamat! Anda mendapatkan <?= $poinDapat ?> Poin</strong>
+                            <span style="font-size: 0.8rem;">Poin ini akan ditambahkan ke akun Anda setelah transaksi selesai. (Rp 10.000 = 1 Poin)</span>
                         </div>
                     </div>
+                    <?php endif; ?>
 
                     <!-- QR Placeholder -->
                     <div class="nota-qr-section">

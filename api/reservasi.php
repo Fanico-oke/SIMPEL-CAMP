@@ -398,9 +398,8 @@ switch ($method) {
                 ")->execute([$kode_transaksi, $reservasi_id, $user['id'], $tipe, $total_biaya]);
                 $transaksi_id = $db->lastInsertId();
 
-                // Clear checked items from wishlist
-                $checkedIds = array_column($validated_items, 'barang_id');
-                Wishlist::removeByIds($user['id'], $checkedIds);
+                // Clear ALL items from wishlist after successful booking
+                Wishlist::clearByUser($user['id']);
 
                 // Notify admin
                 $db->prepare("
@@ -650,61 +649,9 @@ switch ($method) {
                 error_log("API Reservasi Activate Error: " . $e->getMessage());
                 jsonError('Gagal memproses aktivasi', 500);
             }
-        }
-        // === COMPLETE RESERVASI (admin) ===
-        elseif ($action === 'complete') {
-            if (!in_array($user['role'], ['admin', 'superadmin'])) {
-                jsonError('Akses ditolak', 403);
-            }
-
-            $input = json_decode(file_get_contents('php://input'), true);
-            if (!$input) $input = $_POST;
-            $id = intval($input['id'] ?? 0);
-            
-            if ($id <= 0) jsonError('ID reservasi tidak valid');
-
-            try {
-                $db->beginTransaction();
-
-                $stmtCheck = $db->prepare("SELECT * FROM reservasi WHERE id = ? AND status = 'aktif'");
-                $stmtCheck->execute([$id]);
-                $reservasi = $stmtCheck->fetch();
-                if (!$reservasi) jsonError('Reservasi tidak ditemukan atau status tidak valid (harus Aktif)');
-
-                // Update status reservasi to selesai
-                $db->prepare("UPDATE reservasi SET status = 'selesai' WHERE id = ?")->execute([$id]);
-
-                // Update status transaksi to selesai if exists
-                $db->prepare("UPDATE transaksi SET status = 'selesai' WHERE reservasi_id = ?")->execute([$id]);
-
-                // Kembalikan stok barang
-                $stmtItems = $db->prepare("SELECT barang_id, jumlah FROM detail_reservasi WHERE reservasi_id = ?");
-                $stmtItems->execute([$id]);
-                foreach ($stmtItems->fetchAll() as $item) {
-                    $db->prepare("UPDATE barang SET stok_tersedia = stok_tersedia + ? WHERE id = ?")
-                        ->execute([$item['jumlah'], $item['barang_id']]);
-                }
-
-                // Notifikasi ke pelanggan
-                $db->prepare("
-                    INSERT INTO notifikasi (user_id, judul, pesan, tipe, link)
-                    VALUES (?, 'Penyewaan Selesai', ?, 'transaksi', ?)
-                ")->execute([
-                    $reservasi['user_id'],
-                    "Terima kasih telah menyewa! Barang untuk reservasi {$reservasi['kode_reservasi']} telah dikembalikan dengan sukses.",
-                    "?page=pesanan"
-                ]);
-
-                $db->commit();
-                jsonSuccess(['id' => $id], 'Reservasi berhasil diselesaikan dan stok dikembalikan');
-            } catch (PDOException $e) {
-                $db->rollBack();
-                error_log("API Reservasi Complete Error: " . $e->getMessage());
-                jsonError('Gagal memproses penyelesaian', 500);
-            }
         } else {
             error_log("API Reservasi Invalid Action Received: '" . $action . "'");
-            jsonError('Action tidak valid. Gunakan: create, approve, reject, cancel, activate, complete');
+            jsonError('Action tidak valid. Gunakan: create, approve, reject, cancel, activate');
         }
         break;
 

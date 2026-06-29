@@ -274,8 +274,162 @@ switch ($method) {
                 error_log("API Pembayaran Reject Error: " . $e->getMessage());
                 jsonError('Gagal menolak pembayaran', 500);
             }
+        }
+
+        // === BAYAR DENDA (pelanggan upload bukti transfer denda) ===
+        elseif ($action === 'bayar_denda') {
+            $transaksi_id = intval($_POST['transaksi_id'] ?? 0);
+            $metode = sanitize($_POST['metode'] ?? '');
+            $catatan = sanitize($_POST['catatan'] ?? '');
+
+            if ($transaksi_id <= 0) jsonError('ID transaksi tidak valid');
+            if (!in_array($metode, ['transfer', 'ewallet', 'qris'])) {
+                jsonError('Metode pembayaran denda tidak valid');
+            }
+
+            try {
+                // Cek transaksi dan pastikan ada denda
+                $stmtTrx = $db->prepare("
+                    SELECT t.*, r.id AS rsv_id, r.status AS rsv_status
+                    FROM transaksi t
+                    LEFT JOIN reservasi r ON t.reservasi_id = r.id
+                    WHERE t.id = ?
+                ");
+                $stmtTrx->execute([$transaksi_id]);
+                $transaksi = $stmtTrx->fetch();
+
+                if (!$transaksi) jsonError('Transaksi tidak ditemukan', 404);
+                if ($user['role'] === 'pelanggan' && $transaksi['user_id'] != $user['id']) {
+                    jsonError('Akses ditolak', 403);
+                }
+                if ($transaksi['denda'] <= 0) jsonError('Tidak ada denda pada transaksi ini');
+                if ($transaksi['rsv_status'] !== 'menunggu_denda') {
+                    jsonError('Transaksi ini tidak dalam status menunggu pembayaran denda');
+                }
+
+                // Upload bukti bayar denda
+                if (!isset($_FILES['bukti_bayar']) || $_FILES['bukti_bayar']['error'] !== UPLOAD_ERR_OK) {
+                    jsonError('Bukti transfer denda wajib diunggah');
+                }
+                $bukti_bayar = uploadBuktiBayar($_FILES['bukti_bayar']);
+                if ($bukti_bayar === false) {
+                    jsonError('Gagal mengupload bukti bayar. Pastikan format JPG/PNG/WebP dan ukuran max 2MB.');
+                }
+
+                // Insert pembayaran denda
+                $db->prepare("
+                    INSERT INTO pembayaran (transaksi_id, jenis_pembayaran, metode, jumlah, bukti_bayar, status, catatan)
+                    VALUES (?, 'denda', ?, ?, ?, 'pending', ?)
+                ")->execute([$transaksi_id, $metode, $transaksi['denda'], $bukti_bayar, $catatan]);
+
+                // Notifikasi ke admin
+                $stmtNotif = $db->prepare("
+                    INSERT INTO notifikasi (user_id, judul, pesan, tipe, link)
+                    SELECT id, ?, ?, 'pembayaran', ?
+                    FROM users WHERE role IN ('admin', 'superadmin') AND status = 'aktif'
+                ");
+                $stmtNotif->execute([
+                    'Pembayaran Denda Masuk',
+                    "Pelanggan {$user['nama']} mengirim bukti pembayaran denda untuk transaksi {$transaksi['kode_transaksi']}.",
+                    "?page=pembayaran"
+                ]);
+
+                jsonSuccess(['id' => $db->lastInsertId()], 'Bukti pembayaran denda berhasil dikirim. Menunggu verifikasi admin.');
+            } catch (PDOException $e) {
+                error_log("API Pembayaran Bayar Denda Error: " . $e->getMessage());
+                jsonError('Gagal mengirim bukti pembayaran denda', 500);
+            }
+        }
+
+        // === KONFIRMASI DENDA (admin: verifikasi online / terima tunai) ===
+        elseif ($action === 'konfirmasi_denda') {
+            if (!in_array($user['role'], ['admin', 'superadmin'])) {
+                jsonError('Akses ditolak', 403);
+            }
+
+            $input = json_decode(file_get_contents('php://input'), true);
+            if (!$input) $input = $_POST;
+
+            $transaksi_id = intval($input['transaksi_id'] ?? 0);
+            $metode_denda = sanitize($input['metode_denda'] ?? 'cash'); // cash = tunai, online = verif bukti
+
+            if ($transaksi_id <= 0) jsonError('ID transaksi tidak valid');
+
+            try {
+                $db->beginTransaction();
+
+                // Cek transaksi
+                $stmtTrx = $db->prepare("
+                    SELECT t.*, r.id AS rsv_id, r.status AS rsv_status
+                    FROM transaksi t
+                    LEFT JOIN reservasi r ON t.reservasi_id = r.id
+                    WHERE t.id = ?
+                ");
+                $stmtTrx->execute([$transaksi_id]);
+                $transaksi = $stmtTrx->fetch();
+
+                if (!$transaksi) jsonError('Transaksi tidak ditemukan', 404);
+                if ($transaksi['rsv_status'] !== 'menunggu_denda') {
+                    jsonError('Transaksi ini tidak dalam status menunggu pembayaran denda');
+                }
+
+                if ($metode_denda === 'cash') {
+                    // Admin menerima pembayaran tunai langsung
+                    $db->prepare("
+                        INSERT INTO pembayaran (transaksi_id, jenis_pembayaran, metode, jumlah, status, catatan, confirmed_at)
+                        VALUES (?, 'denda', 'cash', ?, 'dikonfirmasi', 'Diterima tunai oleh admin', NOW())
+                    ")->execute([$transaksi_id, $transaksi['denda']]);
+                } else {
+                    // Verifikasi pembayaran denda online (update yang pending jadi dikonfirmasi)
+                    $db->prepare("
+                        UPDATE pembayaran SET status = 'dikonfirmasi', confirmed_at = NOW()
+                        WHERE transaksi_id = ? AND jenis_pembayaran = 'denda' AND status = 'pending'
+                    ")->execute([$transaksi_id]);
+                }
+
+                // Selesaikan transaksi dan reservasi
+                $db->prepare("UPDATE transaksi SET status = 'selesai' WHERE id = ?")->execute([$transaksi_id]);
+                if ($transaksi['rsv_id']) {
+                    $db->prepare("UPDATE reservasi SET status = 'selesai' WHERE id = ?")->execute([$transaksi['rsv_id']]);
+                }
+
+                // Kembalikan stok barang
+                if ($transaksi['rsv_id']) {
+                    // Cek kondisi barang dari pengembalian
+                    $stmtPg = $db->prepare("SELECT kondisi_barang FROM pengembalian WHERE transaksi_id = ?");
+                    $stmtPg->execute([$transaksi_id]);
+                    $pgData = $stmtPg->fetch();
+                    $kondisi = $pgData['kondisi_barang'] ?? 'baik';
+
+                    if ($kondisi !== 'hilang') {
+                        $stmtItems = $db->prepare("SELECT barang_id, jumlah FROM detail_reservasi WHERE reservasi_id = ?");
+                        $stmtItems->execute([$transaksi['rsv_id']]);
+                        foreach ($stmtItems->fetchAll() as $item) {
+                            $db->prepare("UPDATE barang SET stok_tersedia = stok_tersedia + ? WHERE id = ?")
+                                ->execute([$item['jumlah'], $item['barang_id']]);
+                        }
+                    }
+                }
+
+                // Notifikasi ke pelanggan
+                $db->prepare("
+                    INSERT INTO notifikasi (user_id, judul, pesan, tipe, link)
+                    VALUES (?, 'Denda Lunas - Pesanan Selesai', ?, 'pembayaran', ?)
+                ")->execute([
+                    $transaksi['user_id'],
+                    "Pembayaran denda untuk transaksi {$transaksi['kode_transaksi']} telah dikonfirmasi. Pesanan Anda selesai. Terima kasih!",
+                    "?page=pesanan"
+                ]);
+
+                $db->commit();
+                jsonSuccess(['id' => $transaksi_id], 'Denda berhasil dikonfirmasi. Pesanan selesai.');
+            } catch (PDOException $e) {
+                $db->rollBack();
+                error_log("API Pembayaran Konfirmasi Denda Error: " . $e->getMessage());
+                jsonError('Gagal mengkonfirmasi pembayaran denda', 500);
+            }
         } else {
-            jsonError('Action tidak valid. Gunakan: create, confirm, reject');
+            jsonError('Action tidak valid. Gunakan: create, confirm, reject, bayar_denda, konfirmasi_denda');
         }
         break;
 

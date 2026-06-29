@@ -39,6 +39,11 @@ $notifications = Notifikasi::getByUser($_SESSION['user_id'], 50);
 $unread_count = Notifikasi::countUnread($_SESSION['user_id']);
 $total_count = count($notifications);
 
+// Auto-mark all as read when user opens the notification page
+if ($unread_count > 0) {
+    Notifikasi::markAllRead($_SESSION['user_id']);
+}
+
 // Count by category (tipe maps to category)
 $count_transaksi = 0;
 $count_promo = 0;

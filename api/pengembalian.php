@@ -130,18 +130,38 @@ switch ($method) {
                     $denda_telat = ($transaksi['total_biaya'] ?? $transaksi['total_bayar']) * ($dendaPersen / 100) * $hari_terlambat;
                 }
 
-                // Denda kondisi barang
+                // Ambil pengaturan denda kerusakan dari pengaturan (baru)
+                $stmtSet = $db->query("SELECT `key`, `value` FROM pengaturan WHERE `key` IN ('denda_rusak_ringan_persen', 'denda_rusak_berat_persen', 'denda_hilang_persen')");
+                $settings = [];
+                while ($row = $stmtSet->fetch()) {
+                    $settings[$row['key']] = floatval($row['value']);
+                }
+                $pct_ringan = $settings['denda_rusak_ringan_persen'] ?? 25;
+                $pct_berat  = $settings['denda_rusak_berat_persen'] ?? 50;
+                $pct_hilang = $settings['denda_hilang_persen'] ?? 100;
+
+                // Denda kondisi barang (Berdasarkan harga ganti/denda barang, bukan harga sewa)
                 $denda_kondisi = 0;
-                $total_biaya = $transaksi['total_biaya'] ?? $transaksi['total_bayar'];
+                
+                // Hitung total harga denda (harga ganti) dari semua barang di reservasi ini
+                $stmtGanti = $db->prepare("
+                    SELECT SUM(b.harga_denda * dr.jumlah) as total_ganti
+                    FROM detail_reservasi dr
+                    JOIN barang b ON dr.barang_id = b.id
+                    WHERE dr.reservasi_id = ?
+                ");
+                $stmtGanti->execute([$transaksi['reservasi_id'] ?? 0]);
+                $total_ganti = (float) $stmtGanti->fetchColumn();
+
                 switch ($kondisi_barang) {
                     case 'rusak_ringan':
-                        $denda_kondisi = $total_biaya * 0.25; // 25% biaya
+                        $denda_kondisi = $total_ganti * ($pct_ringan / 100);
                         break;
                     case 'rusak_berat':
-                        $denda_kondisi = $total_biaya * 0.50; // 50% biaya
+                        $denda_kondisi = $total_ganti * ($pct_berat / 100);
                         break;
                     case 'hilang':
-                        $denda_kondisi = $total_biaya * 1.00; // 100% biaya
+                        $denda_kondisi = $total_ganti * ($pct_hilang / 100);
                         break;
                 }
 
@@ -162,7 +182,67 @@ switch ($method) {
             }
         }
 
-        // === CREATE PENGEMBALIAN (admin only) ===
+        // === AJUKAN PENGEMBALIAN (pelanggan upload bukti foto) ===
+        elseif ($action === 'ajukan') {
+            // Pelanggan bisa mengajukan pengembalian
+            $reservasi_id = intval($_POST['reservasi_id'] ?? 0);
+            if ($reservasi_id <= 0) jsonError('ID reservasi tidak valid');
+
+            try {
+                // Cek reservasi milik user ini dan statusnya aktif
+                $stmtRsv = $db->prepare("SELECT * FROM reservasi WHERE id = ? AND user_id = ? AND status = 'aktif'");
+                $stmtRsv->execute([$reservasi_id, $user['id']]);
+                $rsv = $stmtRsv->fetch();
+                if (!$rsv) jsonError('Reservasi tidak ditemukan, bukan milik Anda, atau statusnya tidak aktif');
+
+                // Upload foto bukti
+                if (!isset($_FILES['bukti_foto']) || $_FILES['bukti_foto']['error'] !== UPLOAD_ERR_OK) {
+                    jsonError('Foto bukti kondisi barang wajib diunggah');
+                }
+
+                $file = $_FILES['bukti_foto'];
+                $allowed = ['image/jpeg', 'image/png', 'image/webp'];
+                if (!in_array($file['type'], $allowed)) {
+                    jsonError('Format file harus JPG, PNG, atau WEBP');
+                }
+                if ($file['size'] > 5 * 1024 * 1024) {
+                    jsonError('Ukuran file maksimal 5MB');
+                }
+
+                $ext = pathinfo($file['name'], PATHINFO_EXTENSION);
+                $filename = 'kembali_' . $reservasi_id . '_' . time() . '.' . $ext;
+                $uploadDir = dirname(__DIR__) . '/uploads/pengembalian/';
+                if (!move_uploaded_file($file['tmp_name'], $uploadDir . $filename)) {
+                    jsonError('Gagal mengunggah file');
+                }
+
+                // Update reservasi
+                $db->prepare("
+                    UPDATE reservasi SET status = 'menunggu_cek', bukti_kembali = ?, tgl_pengajuan_kembali = NOW()
+                    WHERE id = ?
+                ")->execute([$filename, $reservasi_id]);
+
+                // Notifikasi ke admin
+                $stmtAdmins = $db->query("SELECT id FROM users WHERE role IN ('admin','superadmin')");
+                foreach ($stmtAdmins->fetchAll() as $admin) {
+                    $db->prepare("
+                        INSERT INTO notifikasi (user_id, judul, pesan, tipe, link)
+                        VALUES (?, 'Pengajuan Pengembalian', ?, 'pengembalian', ?)
+                    ")->execute([
+                        $admin['id'],
+                        "Pelanggan {$user['nama']} mengajukan pengembalian untuk reservasi {$rsv['kode_reservasi']}",
+                        "?page=detail_reservasi&id=$reservasi_id"
+                    ]);
+                }
+
+                jsonSuccess(['id' => $reservasi_id], 'Pengajuan pengembalian berhasil dikirim. Menunggu pengecekan admin.');
+            } catch (PDOException $e) {
+                error_log("API Pengembalian Ajukan Error: " . $e->getMessage());
+                jsonError('Gagal mengajukan pengembalian', 500);
+            }
+        }
+
+        // === CREATE PENGEMBALIAN (admin only - verifikasi) ===
         elseif ($action === 'create') {
             if (!in_array($user['role'], ['admin', 'superadmin'])) {
                 jsonError('Hanya admin yang bisa memproses pengembalian', 403);
@@ -218,11 +298,31 @@ switch ($method) {
                     $denda_telat = $total_biaya * ($dendaPersen / 100) * $hari_terlambat;
                 }
 
+                // Ambil pengaturan denda kerusakan
+                $stmtSet = $db->query("SELECT `key`, `value` FROM pengaturan WHERE `key` IN ('denda_rusak_ringan_persen', 'denda_rusak_berat_persen', 'denda_hilang_persen')");
+                $settings = [];
+                while ($row = $stmtSet->fetch()) {
+                    $settings[$row['key']] = floatval($row['value']);
+                }
+                $pct_ringan = $settings['denda_rusak_ringan_persen'] ?? 25;
+                $pct_berat  = $settings['denda_rusak_berat_persen'] ?? 50;
+                $pct_hilang = $settings['denda_hilang_persen'] ?? 100;
+
+                // Hitung total harga denda (harga ganti) dari semua barang
+                $stmtGanti = $db->prepare("
+                    SELECT SUM(b.harga_denda * dr.jumlah) as total_ganti
+                    FROM detail_reservasi dr
+                    JOIN barang b ON dr.barang_id = b.id
+                    WHERE dr.reservasi_id = ?
+                ");
+                $stmtGanti->execute([$transaksi['rsv_id'] ?? 0]);
+                $total_ganti = (float) $stmtGanti->fetchColumn();
+
                 $denda_kondisi = 0;
                 switch ($kondisi_barang) {
-                    case 'rusak_ringan': $denda_kondisi = $total_biaya * 0.25; break;
-                    case 'rusak_berat':  $denda_kondisi = $total_biaya * 0.50; break;
-                    case 'hilang':       $denda_kondisi = $total_biaya * 1.00; break;
+                    case 'rusak_ringan': $denda_kondisi = $total_ganti * ($pct_ringan / 100); break;
+                    case 'rusak_berat':  $denda_kondisi = $total_ganti * ($pct_berat / 100); break;
+                    case 'hilang':       $denda_kondisi = $total_ganti * ($pct_hilang / 100); break;
                 }
 
                 $total_denda = $denda_telat + $denda_kondisi;
@@ -236,19 +336,27 @@ switch ($method) {
                     $kondisi_barang, $total_denda, $catatan
                 ]);
 
-                // Update denda di transaksi dan set status selesai
-                $db->prepare("
-                    UPDATE transaksi SET denda = ?, status = 'selesai' WHERE id = ?
-                ")->execute([$total_denda, $transaksi_id]);
-
-                // Update status reservasi jika ada
-                if ($transaksi['rsv_id']) {
-                    $db->prepare("UPDATE reservasi SET status = 'selesai' WHERE id = ?")
-                        ->execute([$transaksi['rsv_id']]);
+                // Update denda di transaksi
+                if ($total_denda > 0) {
+                    // Ada denda → status menunggu_denda
+                    $db->prepare("UPDATE transaksi SET denda = ?, status = 'aktif' WHERE id = ?")
+                        ->execute([$total_denda, $transaksi_id]);
+                    if ($transaksi['rsv_id']) {
+                        $db->prepare("UPDATE reservasi SET status = 'menunggu_denda' WHERE id = ?")
+                            ->execute([$transaksi['rsv_id']]);
+                    }
+                } else {
+                    // Tidak ada denda → langsung selesai
+                    $db->prepare("UPDATE transaksi SET denda = 0, status = 'selesai' WHERE id = ?")
+                        ->execute([$transaksi_id]);
+                    if ($transaksi['rsv_id']) {
+                        $db->prepare("UPDATE reservasi SET status = 'selesai' WHERE id = ?")
+                            ->execute([$transaksi['rsv_id']]);
+                    }
                 }
 
-                // Kembalikan stok barang (kecuali hilang)
-                if ($transaksi['rsv_id'] && $kondisi_barang !== 'hilang') {
+                // Kembalikan stok barang (kecuali hilang) — hanya jika tidak ada denda (langsung selesai)
+                if ($total_denda <= 0 && $transaksi['rsv_id'] && $kondisi_barang !== 'hilang') {
                     $stmtItems = $db->prepare("SELECT barang_id, jumlah FROM detail_reservasi WHERE reservasi_id = ?");
                     $stmtItems->execute([$transaksi['rsv_id']]);
 
@@ -259,6 +367,7 @@ switch ($method) {
                 }
 
                 // Update member level
+                $poin_dapat = floor($transaksi['total_bayar'] / 10000);
                 $db->prepare("
                     UPDATE member_level SET
                         total_transaksi = total_transaksi + 1,
@@ -267,10 +376,14 @@ switch ($method) {
                     WHERE user_id = ?
                 ")->execute([
                     $transaksi['total_bayar'],
-                    floor($transaksi['total_bayar'] / 10000), // 1 poin per 10rb
+                    $poin_dapat, // 1 poin per 10rb
                     $transaksi['user_id']
                 ]);
-
+                
+                if ($poin_dapat > 0) {
+                    $db->prepare("INSERT INTO riwayat_poin (user_id, jenis, jumlah, keterangan) VALUES (?, 'masuk', ?, ?)")
+                       ->execute([$transaksi['user_id'], $poin_dapat, "Poin dari transaksi " . $transaksi['kode_transaksi']]);
+                }
                 // Auto-upgrade member level
                 $stmtMember = $db->prepare("SELECT total_transaksi FROM member_level WHERE user_id = ?");
                 $stmtMember->execute([$transaksi['user_id']]);
@@ -301,15 +414,25 @@ switch ($method) {
                 }
 
                 // Notifikasi ke pelanggan
-                $db->prepare("
-                    INSERT INTO notifikasi (user_id, judul, pesan, tipe, link)
-                    VALUES (?, 'Barang Dikembalikan', ?, 'pengembalian', ?)
-                ")->execute([
-                    $transaksi['user_id'],
-                    "Pengembalian untuk transaksi {$transaksi['kode_transaksi']} telah diproses." .
-                    ($total_denda > 0 ? " Denda: " . formatRupiah($total_denda) : ' Tidak ada denda.'),
-                    "?page=transaksi&id=$transaksi_id"
-                ]);
+                if ($total_denda > 0) {
+                    $db->prepare("
+                        INSERT INTO notifikasi (user_id, judul, pesan, tipe, link)
+                        VALUES (?, 'Ada Denda Pengembalian', ?, 'pengembalian', ?)
+                    ")->execute([
+                        $transaksi['user_id'],
+                        "Barang untuk transaksi {$transaksi['kode_transaksi']} telah dicek. Ada denda sebesar " . formatRupiah($total_denda) . ". Silakan lakukan pembayaran denda.",
+                        "?page=pesanan"
+                    ]);
+                } else {
+                    $db->prepare("
+                        INSERT INTO notifikasi (user_id, judul, pesan, tipe, link)
+                        VALUES (?, 'Barang Dikembalikan', ?, 'pengembalian', ?)
+                    ")->execute([
+                        $transaksi['user_id'],
+                        "Pengembalian untuk transaksi {$transaksi['kode_transaksi']} telah diproses. Tidak ada denda. Terima kasih!",
+                        "?page=pesanan"
+                    ]);
+                }
 
                 $db->commit();
 
@@ -324,7 +447,7 @@ switch ($method) {
                 jsonError('Gagal memproses pengembalian', 500);
             }
         } else {
-            jsonError('Action tidak valid. Gunakan: create, hitung_denda');
+            jsonError('Action tidak valid. Gunakan: ajukan, create, hitung_denda');
         }
         break;
 

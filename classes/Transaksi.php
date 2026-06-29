@@ -283,7 +283,7 @@ class Transaksi {
 
             $whereClause = 'WHERE ' . implode(' AND ', $where);
 
-            $stmt = $db->prepare("SELECT COALESCE(SUM(total_bayar), 0) as total FROM transaksi {$whereClause}");
+            $stmt = $db->prepare("SELECT COALESCE(SUM(total_bayar + denda), 0) as total FROM transaksi {$whereClause}");
             $stmt->execute($params);
             return (float)$stmt->fetch()['total'];
         } catch (PDOException $e) {

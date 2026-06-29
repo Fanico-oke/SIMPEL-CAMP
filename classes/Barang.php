@@ -84,8 +84,8 @@ class Barang {
             $db = Database::getInstance();
             $stokTotal = (int)($data['stok_total'] ?? 0);
             $stmt = $db->prepare("
-                INSERT INTO barang (kategori_id, nama, deskripsi, gambar, harga_per_hari, stok_total, stok_tersedia, status, created_at)
-                VALUES (:kategori_id, :nama, :deskripsi, :gambar, :harga, :stok_total, :stok_tersedia, :status, NOW())
+                INSERT INTO barang (kategori_id, nama, deskripsi, gambar, harga_per_hari, harga_denda, stok_total, stok_tersedia, status, created_at)
+                VALUES (:kategori_id, :nama, :deskripsi, :gambar, :harga, :harga_denda, :stok_total, :stok_tersedia, :status, NOW())
             ");
             $stmt->execute([
                 ':kategori_id'    => $data['kategori_id'],
@@ -93,6 +93,7 @@ class Barang {
                 ':deskripsi'      => $data['deskripsi'] ?? null,
                 ':gambar'         => $data['gambar'] ?? null,
                 ':harga'          => $data['harga_per_hari'],
+                ':harga_denda'    => $data['harga_denda'] ?? 0,
                 ':stok_total'     => $stokTotal,
                 ':stok_tersedia'  => $stokTotal, // Stok tersedia = stok total saat pertama dibuat
                 ':status'         => $data['status'] ?? 'tersedia'

@@ -57,6 +57,16 @@ $promos = $stmtPromo->fetchAll(PDO::FETCH_ASSOC);
 
 // Wishlist count for badge
 $wishlistCount = Wishlist::count($_SESSION['user_id']);
+
+// Load Fines Policy from DB
+$stmtSet = $db->query("SELECT `key`, `value` FROM pengaturan WHERE `key` IN ('denda_rusak_ringan_persen', 'denda_rusak_berat_persen', 'denda_hilang_persen')");
+$settings = [];
+while ($row = $stmtSet->fetch(PDO::FETCH_ASSOC)) {
+    $settings[$row['key']] = $row['value'];
+}
+$d_ringan = $settings['denda_rusak_ringan_persen'] ?? 25;
+$d_berat  = $settings['denda_rusak_berat_persen'] ?? 50;
+$d_hilang = $settings['denda_hilang_persen'] ?? 100;
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -1061,6 +1071,22 @@ body {
                                 <input type="checkbox" id="availToggle" onchange="applyFilters()">
                                 <span class="toggle-slider"></span>
                             </label>
+                        </div>
+                    </div>
+
+                    <!-- Policy Info Box -->
+                    <div class="sidebar-section policy-box" style="margin-top: 1rem; padding: 1.25rem; background: rgba(220, 38, 38, 0.05); border: 1px solid rgba(220, 38, 38, 0.15); border-radius: 12px;">
+                        <div class="sidebar-section-title" style="color: #991B1B; font-size:0.9rem; margin-bottom:12px;">
+                            <i class="bi bi-info-circle-fill" style="color: #DC2626;"></i> Kebijakan & Denda
+                        </div>
+                        <ul style="padding-left:16px; margin:0; font-size:0.75rem; color:#7F1D1D; display:flex; flex-direction:column; gap:8px;">
+                            <li><strong>Keterlambatan:</strong> Denda seharga sewa per hari untuk tiap hari keterlambatan.</li>
+                            <li><strong>Rusak Ringan:</strong> Denda <?= $d_ringan ?>% dari harga beli/ganti.</li>
+                            <li><strong>Rusak Berat:</strong> Denda <?= $d_berat ?>% dari harga beli/ganti.</li>
+                            <li><strong>Hilang:</strong> Denda <?= $d_hilang ?>% dari harga beli/ganti.</li>
+                        </ul>
+                        <div style="font-size:0.7rem; color:#991B1B; margin-top:12px; font-weight:600; font-style:italic;">
+                            *Denda dapat dibayar tunai di toko atau via transfer/QRIS.
                         </div>
                     </div>
                 </div>

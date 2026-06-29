@@ -181,9 +181,9 @@ if (!function_exists('isActive')) {
                     <i class="bi bi-box-seam"></i><span class="nav-text">Kelola Barang</span>
                 </a>
             </li>
-            <li class="nav-item <?= isActive('pelanggan.php', $currentPage) ?>">
-                <a href="<?= BASE_URL ?>/pages/admin/pelanggan.php" class="nav-link" data-tooltip="Data Pelanggan">
-                    <i class="bi bi-people"></i><span class="nav-text">Data Pelanggan</span>
+            <li class="nav-item <?= isActive('kelola_member.php', $currentPage) ?>">
+                <a href="<?= BASE_URL ?>/pages/admin/kelola_member.php" class="nav-link" data-tooltip="Pelanggan & Member">
+                    <i class="bi bi-people"></i><span class="nav-text">Pelanggan & Member</span>
                 </a>
             </li>
         </ul>

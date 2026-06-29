@@ -336,11 +336,16 @@ $last_name = $name_parts[1] ?? '';
         /* Stats Row */
         .profil-stats-row {
             display: flex;
+            align-items: stretch;
             gap: 0;
             margin-left: auto;
             flex-shrink: 0;
         }
         .profil-stat {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
             text-align: center;
             padding: 14px 28px;
             position: relative;
@@ -358,7 +363,8 @@ $last_name = $name_parts[1] ?? '';
             font-weight: 700;
             font-size: 1.25rem;
             color: var(--primary);
-            line-height: 1.2;
+            line-height: 1;
+            margin-bottom: 4px;
         }
         .profil-stat-label {
             font-family: var(--font-body);
@@ -366,7 +372,6 @@ $last_name = $name_parts[1] ?? '';
             color: var(--text-muted);
             text-transform: uppercase;
             letter-spacing: 0.6px;
-            margin-top: 2px;
         }
 
         /* Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
@@ -1445,11 +1450,11 @@ $last_name = $name_parts[1] ?? '';
 
                             <div class="quick-action-item danger-action" id="action-delete-account">
                                 <div class="quick-action-icon red">
-                                    <i class="bi bi-trash3-fill"></i>
+                                    <i class="bi bi-person-x-fill"></i>
                                 </div>
                                 <div class="quick-action-info">
-                                    <h6>Hapus Akun</h6>
-                                    <p>Hapus akun secara permanen</p>
+                                    <h6>Nonaktifkan Akun</h6>
+                                    <p>Nonaktifkan sementara akun Anda</p>
                                 </div>
                                 <i class="bi bi-chevron-right"></i>
                             </div>
@@ -1585,6 +1590,47 @@ $last_name = $name_parts[1] ?? '';
                 <button type="button" class="btn-profil-primary" id="btn-verify-otp" style="min-width: 200px;">
                     <i class="bi bi-patch-check me-1"></i> Verifikasi
                 </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Download Data -->
+<div class="modal fade" id="modalDownloadData" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border:none; border-radius:20px; overflow:hidden; box-shadow:0 25px 80px rgba(0,0,0,0.15);">
+            <div class="modal-header" style="background:#F8FAF9; border-bottom:1px solid rgba(0,0,0,0.04); padding:1.5rem;">
+                <h5 class="modal-title fw-bold" style="font-family:'Outfit',sans-serif; color:var(--text-primary);">
+                    <i class="bi bi-cloud-arrow-down me-2" style="color:var(--primary);"></i>Unduh Data
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <p class="text-muted mb-4" style="font-size:0.9rem;">Pilih format file untuk mengunduh laporan data pribadi dan riwayat transaksi Anda:</p>
+                <div class="d-grid gap-3">
+                    <button type="button" class="btn text-start" style="border-radius:12px; padding:1rem 1.2rem; border:1.5px solid #dcfce7; color:#166534; background:#f0fdf4;" onclick="executeDownload('csv')">
+                        <div style="display:flex;align-items:center;gap:12px;">
+                            <div style="width:42px;height:42px;border-radius:12px;background:#dcfce7;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                                <i class="bi bi-file-earmark-spreadsheet fs-4" style="color:#16a34a;"></i>
+                            </div>
+                            <div>
+                                <div class="fw-bold" style="font-size:0.95rem;">Format Excel / CSV (.csv)</div>
+                                <div style="font-size:0.78rem;color:#6b7280;margin-top:2px;">Bisa dibuka di Excel / Google Sheets</div>
+                            </div>
+                        </div>
+                    </button>
+                    <button type="button" class="btn text-start" style="border-radius:12px; padding:1rem 1.2rem; border:1.5px solid #fee2e2; color:#991b1b; background:#fef2f2;" onclick="executeDownload('pdf')">
+                        <div style="display:flex;align-items:center;gap:12px;">
+                            <div style="width:42px;height:42px;border-radius:12px;background:#fee2e2;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                                <i class="bi bi-file-earmark-pdf fs-4" style="color:#dc2626;"></i>
+                            </div>
+                            <div>
+                                <div class="fw-bold" style="font-size:0.95rem;">Format Lengkap (.pdf)</div>
+                                <div style="font-size:0.78rem;color:#6b7280;margin-top:2px;">Langsung diunduh sebagai dokumen PDF</div>
+                            </div>
+                        </div>
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -1933,16 +1979,25 @@ document.addEventListener('DOMContentLoaded', function () {
     //  QUICK ACTIONS
     // Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
     document.getElementById('action-riwayat').addEventListener('click', function () {
-        showToast('info', 'Riwayat Transaksi', 'Mengarahkan ke halaman riwayat transaksi...');
+        window.location.href = '<?= BASE_URL ?>/pages/pelanggan/transaksi.php';
     });
 
     document.getElementById('action-bantuan').addEventListener('click', function () {
-        showToast('info', 'Pusat Bantuan', 'Membuka pusat bantuan...');
+        window.open('https://wa.me/6281333715914?text=Halo%20Admin%20SIMPEL-CAMP,%20saya%20butuh%20bantuan.', '_blank');
     });
 
     document.getElementById('action-download').addEventListener('click', function () {
-        showToast('success', 'Mengunduh Data', 'Data pribadi Anda sedang disiapkan untuk diunduh.');
+        new bootstrap.Modal(document.getElementById('modalDownloadData')).show();
     });
+
+    window.executeDownload = function(format) {
+        bootstrap.Modal.getInstance(document.getElementById('modalDownloadData')).hide();
+        if (format === 'pdf') {
+            window.open('<?= BASE_URL ?>/pages/pelanggan/download_data.php?format=pdf', '_blank');
+        } else {
+            window.location.href = '<?= BASE_URL ?>/pages/pelanggan/download_data.php?format=' + format;
+        }
+    };
 
     // Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
     //  AVATAR CHANGE

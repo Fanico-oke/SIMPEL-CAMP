@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // pages/admin/nota.php
 require_once dirname(__DIR__, 2) . '/config/constants.php';
 require_once dirname(__DIR__, 2) . '/config/database.php';
@@ -557,17 +557,19 @@ $invoiceDate = date('d F Y', strtotime($transaksi['created_at'] ?? 'now'));
                         Terima kasih telah menyewa di SIMPEL-CAMP. Barang yang disewa wajib dikembalikan dalam kondisi baik. Kerusakan atau kehilangan akan dikenakan biaya penggantian sesuai ketentuan yang berlaku.
                     </div>
 
-                    <!-- Signatures -->
-                    <div class="signatures">
-                        <div class="signature-block">
-                            <div class="signature-line"></div>
-                            <div class="signature-label">Penyewa</div>
-                        </div>
-                        <div class="signature-block">
-                            <div class="signature-line"></div>
-                            <div class="signature-label">Petugas</div>
+                    <!-- Points Info -->
+                    <?php 
+                    $poinDapat = floor($totalBayar / 10000); 
+                    if ($poinDapat > 0): 
+                    ?>
+                    <div style="background: rgba(139, 92, 246, 0.08); border-radius: 8px; padding: 12px; margin-top: 20px; display: flex; align-items: center; gap: 10px; color: #6D28D9; border: 1px solid rgba(139, 92, 246, 0.2);">
+                        <i class="bi bi-star-fill" style="font-size: 1.2rem;"></i>
+                        <div>
+                            <strong style="display: block; font-size: 0.9rem;">Selamat! Anda mendapatkan <?= $poinDapat ?> Poin</strong>
+                            <span style="font-size: 0.8rem;">Poin ini akan ditambahkan ke akun Anda setelah transaksi selesai. (Rp 10.000 = 1 Poin)</span>
                         </div>
                     </div>
+                    <?php endif; ?>
 
                     <!-- Legal -->
                     <div class="invoice-legal">

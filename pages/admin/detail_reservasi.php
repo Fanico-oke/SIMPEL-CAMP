@@ -24,6 +24,12 @@ if ($rsvId > 0) {
         if (!empty($reservasi['user_id'])) {
             $pelanggan = User::getById($reservasi['user_id']);
         }
+        $db = Database::getInstance();
+        $stmtTrx = $db->prepare("SELECT id, denda FROM transaksi WHERE reservasi_id = ? LIMIT 1");
+        $stmtTrx->execute([$rsvId]);
+        $trxData = $stmtTrx->fetch();
+        $transaksiId = $trxData ? $trxData['id'] : 0;
+        $dendaTrans = $trxData ? $trxData['denda'] : 0;
     }
 }
 
@@ -47,6 +53,8 @@ $statusMap = [
     'pending' => ['status-confirmed', 'Pending', 'bi-hourglass-split'],
     'dikonfirmasi' => ['status-confirmed', 'Dikonfirmasi', 'bi-check-circle-fill'],
     'aktif' => ['status-confirmed', 'Aktif', 'bi-play-circle-fill'],
+    'menunggu_cek' => ['status-confirmed', 'Menunggu Pengecekan', 'bi-search'],
+    'menunggu_denda' => ['status-confirmed', 'Menunggu Denda', 'bi-cash'],
     'selesai' => ['status-confirmed', 'Selesai', 'bi-check-circle-fill'],
     'batal' => ['status-confirmed', 'Batal', 'bi-x-circle-fill'],
 ];
@@ -213,13 +221,24 @@ $adminName = $_SESSION['nama'] ?? 'Admin';
                                     </tr>
                                     <?php endforeach; ?>
                                     <tr class="summary-row">
-                                        <td colspan="5" class="text-end text-secondary">Subtotal</td>
+                                        <td colspan="5" class="text-end text-secondary">Subtotal Sewa</td>
                                         <td class="text-end mono-font fw-medium">Rp <?= number_format($subtotal, 0, ',', '.') ?></td>
                                     </tr>
+                                    <?php if ($dendaTrans > 0): ?>
+                                    <tr class="summary-row" style="color:#DC2626;">
+                                        <td colspan="5" class="text-end fw-bold">Denda (Keterlambatan/Kerusakan)</td>
+                                        <td class="text-end mono-font fw-bold">+ Rp <?= number_format($dendaTrans, 0, ',', '.') ?></td>
+                                    </tr>
+                                    <tr class="total-row">
+                                        <td colspan="5" class="text-end">Total Akhir</td>
+                                        <td class="text-end mono-font">Rp <?= number_format($totalBiaya + $dendaTrans, 0, ',', '.') ?></td>
+                                    </tr>
+                                    <?php else: ?>
                                     <tr class="total-row">
                                         <td colspan="5" class="text-end">Total</td>
                                         <td class="text-end mono-font">Rp <?= number_format($totalBiaya, 0, ',', '.') ?></td>
                                     </tr>
+                                    <?php endif; ?>
                                     <?php else: ?>
                                     <tr><td colspan="6" class="text-center text-muted py-3">Tidak ada detail barang</td></tr>
                                     <?php endif; ?>
@@ -315,13 +334,69 @@ $adminName = $_SESSION['nama'] ?? 'Admin';
                 <button class="btn-action btn-approve" onclick="confirmAction('activate')"><i class="bi bi-cash-coin"></i> Lunas & Barang Diambil</button>
                 <?php endif; ?>
                 <?php if ($status == 'aktif'): ?>
-                <button class="btn-action btn-return" onclick="confirmAction('return')"><i class="bi bi-box-arrow-in-left"></i> Tandai Dikembalikan</button>
+                <button class="btn-action btn-return" data-bs-toggle="modal" data-bs-target="#returnModal"><i class="bi bi-box-arrow-in-left"></i> Tandai Dikembalikan</button>
+                <?php endif; ?>
+                <?php if ($status == 'menunggu_cek'): ?>
+                <button class="btn-action btn-return" style="background:#059669;color:#fff;" data-bs-toggle="modal" data-bs-target="#returnModal"><i class="bi bi-check-all"></i> Verifikasi Pengembalian</button>
+                <?php endif; ?>
+                <?php if ($status == 'menunggu_denda'): ?>
+                <button class="btn-action" style="background:#DC2626;color:#fff;" onclick="terimaDendaTunai()"><i class="bi bi-cash-stack"></i> Terima Denda Tunai</button>
                 <?php endif; ?>
                 <a href="<?= BASE_URL ?>/pages/admin/transaksi.php" class="btn-action btn-nota"><i class="bi bi-arrow-left"></i> Kembali ke Daftar</a>
             </div>
 
         </div>
     </div>
+</div>
+
+<!-- Modal Pengembalian -->
+<div class="modal fade" id="returnModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Form Verifikasi Pengembalian</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <?php if ($status == 'menunggu_cek' && !empty($reservasi['bukti_kembali'])): ?>
+            <div class="mb-4">
+                <label class="form-label fw-bold">Bukti Foto dari Pelanggan</label>
+                <div style="border-radius:12px;overflow:hidden;border:1px solid #e5e7eb;">
+                    <img src="<?= BASE_URL ?>/uploads/pengembalian/<?= $reservasi['bukti_kembali'] ?>" alt="Bukti Foto" style="width:100%; height:auto;">
+                </div>
+                <small class="text-muted mt-1 d-block">Dikirim pada: <?= date('d M Y H:i', strtotime($reservasi['tgl_pengajuan_kembali'])) ?></small>
+            </div>
+        <?php endif; ?>
+        <form id="formPengembalian">
+            <input type="hidden" id="transaksi_id" value="<?= (int)$transaksiId ?>">
+            
+            <div class="mb-3">
+                <label class="form-label">Tanggal Kembali Fisik</label>
+                <input type="date" class="form-control" id="tanggal_kembali" value="<?= ($status == 'menunggu_cek' && !empty($reservasi['tgl_pengajuan_kembali'])) ? date('Y-m-d', strtotime($reservasi['tgl_pengajuan_kembali'])) : date('Y-m-d') ?>" required>
+            </div>
+            
+            <div class="mb-3">
+                <label class="form-label">Kondisi Barang Setelah Dicek</label>
+                <select class="form-select" id="kondisi_barang" required>
+                    <option value="baik">Baik (Sempurna)</option>
+                    <option value="rusak_ringan">Rusak Ringan (Denda 25%)</option>
+                    <option value="rusak_berat">Rusak Berat (Denda 50%)</option>
+                    <option value="hilang">Hilang (Denda 100%)</option>
+                </select>
+            </div>
+            
+            <div class="mb-3">
+                <label class="form-label">Catatan Tambahan (Opsional)</label>
+                <textarea class="form-control" id="catatan" rows="3"></textarea>
+            </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+        <button type="button" class="btn btn-primary" onclick="submitPengembalian()">Proses Pengembalian</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
@@ -358,6 +433,61 @@ function confirmAction(action) {
             location.reload();
         } else {
             alert(data.message || 'Gagal memproses aksi');
+        }
+    })
+    .catch(() => alert('Terjadi kesalahan jaringan'));
+}
+function submitPengembalian() {
+    const transaksi_id = document.getElementById('transaksi_id').value;
+    if (transaksi_id == 0) {
+        alert('Data transaksi belum ada atau belum di-generate.');
+        return;
+    }
+
+    const body = {
+        transaksi_id: transaksi_id,
+        tanggal_kembali: document.getElementById('tanggal_kembali').value,
+        kondisi_barang: document.getElementById('kondisi_barang').value,
+        catatan: document.getElementById('catatan').value
+    };
+
+    fetch('<?= BASE_URL ?>/api/pengembalian.php?action=create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message || 'Barang berhasil dikembalikan!');
+            location.reload();
+        } else {
+            alert(data.message || 'Gagal memproses pengembalian');
+        }
+    })
+    .catch(() => alert('Terjadi kesalahan jaringan'));
+}
+
+function terimaDendaTunai() {
+    if (!confirm('Apakah pelanggan telah membayar denda secara tunai? Ini akan langsung menyelesaikan pesanan.')) return;
+    
+    const body = {
+        transaksi_id: <?= (int)$transaksiId ?>,
+        metode_denda: 'cash'
+    };
+
+    fetch('<?= BASE_URL ?>/api/pembayaran.php?action=konfirmasi_denda', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message || 'Denda berhasil dikonfirmasi tunai!');
+            location.reload();
+        } else {
+            alert(data.message || 'Gagal mengkonfirmasi denda');
         }
     })
     .catch(() => alert('Terjadi kesalahan jaringan'));

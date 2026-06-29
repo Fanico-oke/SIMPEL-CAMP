@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 require_once dirname(__DIR__, 2) . '/config/constants.php';
 require_once dirname(__DIR__, 2) . '/config/database.php';
 require_once dirname(__DIR__, 2) . '/includes/auth.php';
@@ -102,6 +102,7 @@ textarea.form-control{resize:vertical;min-height:80px}
         <div class="tr-tabs">
             <button class="tr-tab active" id="tabBtnUmum" onclick="switchTab('umum')"><i class="bi bi-gear me-1"></i>Pengaturan Umum</button>
             <button class="tr-tab" id="tabBtnSewa" onclick="switchTab('sewa')"><i class="bi bi-box-seam me-1"></i>Pengaturan Sewa</button>
+            <button class="tr-tab" id="tabBtnMember" onclick="switchTab('member')"><i class="bi bi-star me-1"></i>Member & Reward</button>
             <button class="tr-tab" id="tabBtnKeamanan" onclick="switchTab('keamanan')"><i class="bi bi-shield-lock me-1"></i>Keamanan</button>
             <button class="tr-tab" id="tabBtnHealth" onclick="switchTab('health')"><i class="bi bi-heart-pulse me-1"></i>System Health</button>
             <button class="tr-tab" id="tabBtnLog" onclick="switchTab('log')"><i class="bi bi-journal-text me-1"></i>Log Aktivitas</button>
@@ -169,6 +170,32 @@ textarea.form-control{resize:vertical;min-height:80px}
                 <div class="setting-row"><div class="setting-info"><div class="setting-label"><i class="bi bi-qr-code me-2" style="color:#f59e0b"></i>QRIS</div><div class="setting-desc">Scan QR untuk pembayaran</div></div><label class="toggle-switch"><input type="checkbox"><span class="toggle-slider"></span></label></div>
                 <div class="text-end mt-3"><button class="btn btn-save" onclick="saveSection('Metode Pembayaran')"><i class="bi bi-check2-circle me-1"></i>Simpan</button></div>
             </div>
+        </div>
+
+        <!-- TAB MEMBER & REWARD -->
+        <div id="tab-member" class="tab-pane-sys" style="display:none">
+            <form action="<?= BASE_URL ?>/api/pengaturan.php" method="POST" class="needs-validation">
+                <input type="hidden" name="action" value="update_batch">
+                <div class="section-card stagger-item">
+                    <div class="section-title"><i class="bi bi-star-fill"></i>Level Member (Minimum Transaksi)</div>
+                    <div class="row g-3">
+                        <div class="col-md-4"><label class="form-label-sm">Bronze Min. Transaksi</label><input type="number" class="form-control" name="settings[bronze_min_transaksi]" value="<?= htmlspecialchars(Pengaturan::get('bronze_min_transaksi', '5')) ?>"></div>
+                        <div class="col-md-4"><label class="form-label-sm">Silver Min. Transaksi</label><input type="number" class="form-control" name="settings[silver_min_transaksi]" value="<?= htmlspecialchars(Pengaturan::get('silver_min_transaksi', '15')) ?>"></div>
+                        <div class="col-md-4"><label class="form-label-sm">Gold Min. Transaksi</label><input type="number" class="form-control" name="settings[gold_min_transaksi]" value="<?= htmlspecialchars(Pengaturan::get('gold_min_transaksi', '30')) ?>"></div>
+                    </div>
+                </div>
+                <div class="section-card stagger-item anim-delay-1">
+                    <div class="section-title"><i class="bi bi-gift-fill"></i>Keuntungan & Tukar Reward</div>
+                    <div class="row g-3">
+                        <div class="col-md-4"><label class="form-label-sm">Poin Tukar Reward 1</label><input type="number" class="form-control" name="settings[reward_1_poin]" value="<?= htmlspecialchars(Pengaturan::get('reward_1_poin', '50')) ?>"></div>
+                        <div class="col-md-8"><label class="form-label-sm">Deskripsi Reward 1</label><input type="text" class="form-control" name="settings[reward_1_desc]" value="<?= htmlspecialchars(Pengaturan::get('reward_1_desc', 'Voucher Diskon 50rb')) ?>"></div>
+                        
+                        <div class="col-md-4"><label class="form-label-sm">Poin Tukar Reward 2</label><input type="number" class="form-control" name="settings[reward_2_poin]" value="<?= htmlspecialchars(Pengaturan::get('reward_2_poin', '100')) ?>"></div>
+                        <div class="col-md-8"><label class="form-label-sm">Deskripsi Reward 2</label><input type="text" class="form-control" name="settings[reward_2_desc]" value="<?= htmlspecialchars(Pengaturan::get('reward_2_desc', 'Gratis Sewa Tenda 1 Hari')) ?>"></div>
+                    </div>
+                    <div class="text-end mt-4"><button type="submit" class="btn btn-save"><i class="bi bi-check2-circle me-1"></i>Simpan Pengaturan Member</button></div>
+                </div>
+            </form>
         </div>
 
         <!-- TAB 3: KEAMANAN -->

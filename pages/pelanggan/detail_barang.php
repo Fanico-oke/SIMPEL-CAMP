@@ -3,6 +3,7 @@ require_once dirname(__DIR__, 2) . '/config/constants.php';
 require_once dirname(__DIR__, 2) . '/includes/auth.php';
 require_once dirname(__DIR__, 2) . '/classes/Barang.php';
 require_once dirname(__DIR__, 2) . '/classes/Kategori.php';
+require_once dirname(__DIR__, 2) . '/classes/Ulasan.php';
 
 if (!isLoggedIn() || $_SESSION['role'] !== 'pelanggan') {
     header('Location: ' . BASE_URL . '/login.php');
@@ -34,6 +35,37 @@ $product_status = $barang['status'];
 $relatedProducts = Barang::getAll(['kategori_id' => $barang['kategori_id'], 'limit' => 4]);
 $relatedProducts = array_filter($relatedProducts, function($p) use ($barang_id) { return $p['id'] != $barang_id; });
 $relatedProducts = array_slice($relatedProducts, 0, 3);
+
+// Fetch policy settings
+$db = Database::getInstance();
+$stmtSet = $db->query("SELECT `key`, `value` FROM pengaturan WHERE `key` IN ('deposit_persen', 'denda_per_hari_persen', 'max_sewa_hari', 'denda_rusak_ringan_persen', 'denda_rusak_berat_persen', 'denda_hilang_persen')");
+$settings = [];
+while ($row = $stmtSet->fetch(PDO::FETCH_ASSOC)) {
+    $settings[$row['key']] = $row['value'];
+}
+$policy_deposit = $settings['deposit_persen'] ?? 30;
+$policy_denda_telat = $settings['denda_per_hari_persen'] ?? 10;
+$policy_max_sewa = $settings['max_sewa_hari'] ?? 30;
+$policy_denda_ringan = $settings['denda_rusak_ringan_persen'] ?? 25;
+$policy_denda_berat = $settings['denda_rusak_berat_persen'] ?? 50;
+$policy_denda_hilang = $settings['denda_hilang_persen'] ?? 100;
+
+// Fetch rating & ulasan
+$ulasanList = Ulasan::getByBarang($barang_id);
+$ratingData = Ulasan::getAverageRating($barang_id);
+$avgRating = $ratingData['avg'];
+$totalReviews = $ratingData['total'];
+
+// Generate star HTML
+$starsHtml = '';
+for ($i = 1; $i <= 5; $i++) {
+    if ($i <= $avgRating) $starsHtml .= '<i class="bi bi-star-fill"></i>';
+    elseif ($i - 0.5 <= $avgRating) $starsHtml .= '<i class="bi bi-star-half"></i>';
+    else $starsHtml .= '<i class="bi bi-star"></i>';
+}
+if ($totalReviews == 0) {
+    $starsHtml = '<i class="bi bi-star" style="color:#ccc;"></i><i class="bi bi-star" style="color:#ccc;"></i><i class="bi bi-star" style="color:#ccc;"></i><i class="bi bi-star" style="color:#ccc;"></i><i class="bi bi-star" style="color:#ccc;"></i>';
+}
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -538,13 +570,16 @@ $relatedProducts = array_slice($relatedProducts, 0, 3);
                 <h1 class="product-name"><?= htmlspecialchars($product_name) ?></h1>
                 <div class="rating-row">
                     <div class="stars">
-                        <i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-half"></i>
+                        <?= $starsHtml ?>
                     </div>
-                    <span class="rating-text">4.8</span>
-                    <span class="review-count">(ulasan)</span>
+                    <?php if ($totalReviews > 0): ?>
+                        <span class="rating-text"><?= number_format($avgRating, 1) ?></span>
+                        <span class="review-count">(<?= $totalReviews ?> ulasan)</span>
+                    <?php else: ?>
+                        <span class="review-count" style="margin-left:5px;">Belum ada ulasan</span>
+                    <?php endif; ?>
                 </div>
                 <div class="price-tag">Rp <?= number_format($product_price, 0, ',', '.') ?> <span>/hari</span></div>
-                <div class="avail-pill"><i class="bi bi-check-circle-fill"></i> <?= $product_stock > 0 ? 'Tersedia - ' . $product_stock . ' unit' : 'Stok Habis' ?></div>
 
                 <!-- Specs 2x2 Grid -->
                 <div class="specs-grid">
@@ -567,50 +602,51 @@ $relatedProducts = array_slice($relatedProducts, 0, 3);
                 </div></div>
 
                 <!-- ══════ Deskripsi Produk ══════ -->
-                <div style="margin-bottom:1.25rem;">
+                <div style="margin-top:1.5rem;margin-bottom:1.25rem;">
                     <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.65rem;">
                         <div style="width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,rgba(82,183,136,0.15),rgba(45,106,79,0.08));display:flex;align-items:center;justify-content:center;color:var(--primary-light);font-size:0.9rem;">
                             <i class="bi bi-file-text-fill"></i>
                         </div>
                         <h6 style="font-family:var(--font-heading);font-weight:700;color:var(--text-primary);font-size:0.95rem;margin:0;">Deskripsi Produk</h6>
                     </div>
-                    <div style="background:linear-gradient(135deg,#F8FAF9,#F2F7F4);border-radius:12px;padding:1rem 1.15rem;border-left:3px solid var(--primary-light);">
+                    <div style="background:linear-gradient(135deg,#F8FAF9,#F2F7F4);border-radius:0 12px 12px 0;padding:1rem 1.15rem;border-left:3px solid var(--primary-light);">
                         <p style="color:var(--text-secondary);font-size:0.86rem;line-height:1.75;margin:0;"><?= nl2br(htmlspecialchars($product_desc)) ?></p>
                     </div>
                 </div>
 
-                <!-- ══════ Informasi Penyewaan ══════ -->
+                <!-- ══════ Informasi Denda ══════ -->
                 <div style="margin-bottom:1.25rem;">
                     <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.65rem;">
-                        <div style="width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,rgba(212,163,115,0.18),rgba(212,163,115,0.06));display:flex;align-items:center;justify-content:center;color:var(--accent-gold);font-size:0.9rem;">
-                            <i class="bi bi-info-circle-fill"></i>
+                        <div style="width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,rgba(220,53,69,0.15),rgba(220,53,69,0.06));display:flex;align-items:center;justify-content:center;color:#dc3545;font-size:0.9rem;">
+                            <i class="bi bi-exclamation-triangle-fill"></i>
                         </div>
-                        <h6 style="font-family:var(--font-heading);font-weight:700;color:var(--text-primary);font-size:0.95rem;margin:0;">Informasi Penyewaan</h6>
+                        <h6 style="font-family:var(--font-heading);font-weight:700;color:var(--text-primary);font-size:0.95rem;margin:0;">Informasi Denda</h6>
+                        <span style="font-size:0.68rem;color:var(--text-secondary);margin-left:auto;">Klik untuk detail</span>
                     </div>
                     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.55rem;">
-                        <!-- Deposit -->
-                        <div style="background:#F8FAF9;border-radius:12px;padding:0.75rem 0.7rem;text-align:center;border:1px solid rgba(82,183,136,0.1);transition:all 0.25s;" onmouseover="this.style.borderColor='var(--primary-light)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='rgba(82,183,136,0.1)';this.style.transform='translateY(0)'">
-                            <div style="width:32px;height:32px;border-radius:50%;background:rgba(82,183,136,0.1);display:flex;align-items:center;justify-content:center;margin:0 auto 0.4rem;color:var(--primary-light);font-size:0.85rem;">
-                                <i class="bi bi-shield-check"></i>
-                            </div>
-                            <div style="font-size:0.7rem;color:var(--text-secondary);margin-bottom:0.15rem;">Deposit</div>
-                            <div style="font-family:var(--font-mono);font-weight:600;color:var(--text-primary);font-size:0.8rem;">Rp 100.000</div>
-                        </div>
-                        <!-- Denda -->
-                        <div style="background:#F8FAF9;border-radius:12px;padding:0.75rem 0.7rem;text-align:center;border:1px solid rgba(220,53,69,0.08);transition:all 0.25s;" onmouseover="this.style.borderColor='#dc3545';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='rgba(220,53,69,0.08)';this.style.transform='translateY(0)'">
+                        <!-- Denda Terlambat -->
+                        <div onclick="showDendaPopup('terlambat')" style="cursor:pointer;background:#F8FAF9;border-radius:12px;padding:0.75rem 0.7rem;text-align:center;border:1px solid rgba(220,53,69,0.08);transition:all 0.25s;" onmouseover="this.style.borderColor='#dc3545';this.style.transform='translateY(-2px)';this.style.boxShadow='0 4px 12px rgba(220,53,69,0.1)'" onmouseout="this.style.borderColor='rgba(220,53,69,0.08)';this.style.transform='translateY(0)';this.style.boxShadow='none'">
                             <div style="width:32px;height:32px;border-radius:50%;background:rgba(220,53,69,0.08);display:flex;align-items:center;justify-content:center;margin:0 auto 0.4rem;color:#dc3545;font-size:0.85rem;">
                                 <i class="bi bi-clock-history"></i>
                             </div>
-                            <div style="font-size:0.7rem;color:var(--text-secondary);margin-bottom:0.15rem;">Denda Telat</div>
-                            <div style="font-family:var(--font-mono);font-weight:600;color:var(--text-primary);font-size:0.8rem;">Rp 25.000<small style="font-family:var(--font-body);color:var(--text-secondary);font-weight:400;">/hari</small></div>
+                            <div style="font-size:0.7rem;color:var(--text-secondary);margin-bottom:0.15rem;">Denda Terlambat</div>
+                            <div style="font-family:var(--font-mono);font-weight:600;color:#dc3545;font-size:0.8rem;"><?= $policy_denda_telat ?>%<small style="font-family:var(--font-body);color:var(--text-secondary);font-weight:400;">/hari</small></div>
                         </div>
-                        <!-- Maks. Sewa -->
-                        <div style="background:#F8FAF9;border-radius:12px;padding:0.75rem 0.7rem;text-align:center;border:1px solid rgba(212,163,115,0.1);transition:all 0.25s;" onmouseover="this.style.borderColor='var(--accent-gold)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='rgba(212,163,115,0.1)';this.style.transform='translateY(0)'">
+                        <!-- Denda Kerusakan -->
+                        <div onclick="showDendaPopup('kerusakan')" style="cursor:pointer;background:#F8FAF9;border-radius:12px;padding:0.75rem 0.7rem;text-align:center;border:1px solid rgba(212,163,115,0.1);transition:all 0.25s;" onmouseover="this.style.borderColor='var(--accent-gold)';this.style.transform='translateY(-2px)';this.style.boxShadow='0 4px 12px rgba(212,163,115,0.1)'" onmouseout="this.style.borderColor='rgba(212,163,115,0.1)';this.style.transform='translateY(0)';this.style.boxShadow='none'">
                             <div style="width:32px;height:32px;border-radius:50%;background:rgba(212,163,115,0.12);display:flex;align-items:center;justify-content:center;margin:0 auto 0.4rem;color:var(--accent-gold);font-size:0.85rem;">
-                                <i class="bi bi-calendar-range"></i>
+                                <i class="bi bi-tools"></i>
                             </div>
-                            <div style="font-size:0.7rem;color:var(--text-secondary);margin-bottom:0.15rem;">Maks. Sewa</div>
-                            <div style="font-family:var(--font-mono);font-weight:600;color:var(--text-primary);font-size:0.8rem;">14 Hari</div>
+                            <div style="font-size:0.7rem;color:var(--text-secondary);margin-bottom:0.15rem;">Denda Kerusakan</div>
+                            <div style="font-family:var(--font-mono);font-weight:600;color:var(--accent-gold);font-size:0.75rem;"><?= $policy_denda_ringan ?>%<small style="font-family:var(--font-body);color:var(--text-secondary);font-weight:400;"> - </small><?= $policy_denda_berat ?>%</div>
+                        </div>
+                        <!-- Denda Kehilangan -->
+                        <div onclick="showDendaPopup('hilang')" style="cursor:pointer;background:#F8FAF9;border-radius:12px;padding:0.75rem 0.7rem;text-align:center;border:1px solid rgba(239,68,68,0.08);transition:all 0.25s;" onmouseover="this.style.borderColor='#ef4444';this.style.transform='translateY(-2px)';this.style.boxShadow='0 4px 12px rgba(239,68,68,0.1)'" onmouseout="this.style.borderColor='rgba(239,68,68,0.08)';this.style.transform='translateY(0)';this.style.boxShadow='none'">
+                            <div style="width:32px;height:32px;border-radius:50%;background:rgba(239,68,68,0.08);display:flex;align-items:center;justify-content:center;margin:0 auto 0.4rem;color:#ef4444;font-size:0.85rem;">
+                                <i class="bi bi-box-seam"></i>
+                            </div>
+                            <div style="font-size:0.7rem;color:var(--text-secondary);margin-bottom:0.15rem;">Denda Hilang</div>
+                            <div style="font-family:var(--font-mono);font-weight:600;color:#ef4444;font-size:0.8rem;"><?= $policy_denda_hilang ?>%</div>
                         </div>
                     </div>
                 </div>
@@ -673,7 +709,7 @@ $relatedProducts = array_slice($relatedProducts, 0, 3);
                     <i class="bi bi-cart-plus"></i> Sewa Sekarang <i class="bi bi-arrow-right"></i>
                 </a>
                 <div class="share-row">
-                    <a href="https://wa.me/?text=Cek%20<?= urlencode($product_name) ?>%20di%20SIMPEL-CAMP!" target="_blank" class="share-btn wa">
+                    <a href="https://wa.me/6281333715914?text=Halo%20Admin,%20saya%20tertarik%20dengan%20<?= urlencode($product_name) ?>%20di%20SIMPEL-CAMP!" target="_blank" class="share-btn wa">
                         <i class="bi bi-whatsapp"></i> WhatsApp
                     </a>
                     <button class="share-btn copy" onclick="copyLink()">
@@ -711,32 +747,67 @@ $relatedProducts = array_slice($relatedProducts, 0, 3);
             </div>
             <!-- Tab 3: Ulasan -->
             <div class="tab-pane fade" id="tabUlasan">
+                <?php if (empty($ulasanList)): ?>
                 <div class="text-center py-4">
                     <i class="bi bi-chat-square-text" style="font-size:2.5rem;color:var(--text-secondary);opacity:0.3;"></i>
                     <p style="color:var(--text-secondary);font-size:0.92rem;margin-top:12px;">Belum ada ulasan untuk produk ini. Jadilah yang pertama memberikan ulasan!</p>
                 </div>
+                <?php else: ?>
+                    <div style="display:flex;flex-direction:column;gap:1.2rem;">
+                    <?php foreach ($ulasanList as $u): ?>
+                        <div style="background:#fff;border-radius:16px;padding:1.25rem;border:1px solid rgba(0,0,0,0.04);box-shadow:0 4px 15px rgba(0,0,0,0.02);">
+                            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:0.75rem;">
+                                <div style="display:flex;align-items:center;gap:0.75rem;">
+                                    <div style="width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,var(--primary-light),var(--primary-dark));display:flex;align-items:center;justify-content:center;color:#fff;font-weight:600;font-family:var(--font-heading);">
+                                        <?= strtoupper(substr($u['user_name'], 0, 1)) ?>
+                                    </div>
+                                    <div>
+                                        <div style="font-weight:600;color:var(--text-primary);font-size:0.9rem;"><?= htmlspecialchars($u['user_name']) ?></div>
+                                        <div style="font-size:0.75rem;color:var(--text-secondary);"><?= date('d M Y, H:i', strtotime($u['created_at'])) ?></div>
+                                    </div>
+                                </div>
+                                <div style="color:#f59e0b;font-size:0.85rem;">
+                                    <?php for($i=1; $i<=5; $i++): ?>
+                                        <i class="bi bi-star<?= $i <= $u['rating'] ? '-fill' : '' ?>"></i>
+                                    <?php endfor; ?>
+                                </div>
+                            </div>
+                            <?php if (!empty($u['komentar'])): ?>
+                                <p style="margin:0;font-size:0.88rem;color:var(--text-secondary);line-height:1.6;"><?= nl2br(htmlspecialchars($u['komentar'])) ?></p>
+                            <?php endif; ?>
+                        </div>
+                    <?php endforeach; ?>
+                    </div>
+                <?php endif; ?>
             </div>
             <!-- Tab 4: Kebijakan -->
             <div class="tab-pane fade" id="tabKebijakan">
                 <div class="policy-item">
                     <div class="policy-icon" style="background:rgba(82,183,136,0.1);color:var(--primary-light);"><i class="bi bi-shield-check"></i></div>
                     <div>
-                        <h6>Deposit: Rp 100.000</h6>
-                        <p>Deposit akan dikembalikan setelah barang dikembalikan dalam kondisi baik.</p>
+                        <h6>Deposit: <?= $policy_deposit ?>%</h6>
+                        <p>Deposit sebesar <?= $policy_deposit ?>% dari total transaksi wajib dibayarkan di awal dan akan dikembalikan saat barang dikembalikan.</p>
                     </div>
                 </div>
                 <div class="policy-item">
                     <div class="policy-icon" style="background:rgba(220,53,69,0.08);color:#dc3545;"><i class="bi bi-clock-history"></i></div>
                     <div>
-                        <h6>Denda Keterlambatan: Rp 25.000/hari</h6>
-                        <p>Denda berlaku untuk setiap hari keterlambatan pengembalian.</p>
+                        <h6>Denda Keterlambatan: <?= $policy_denda_telat ?>% /hari</h6>
+                        <p>Denda sebesar <?= $policy_denda_telat ?>% dari total harga sewa berlaku untuk setiap hari keterlambatan pengembalian.</p>
                     </div>
                 </div>
                 <div class="policy-item">
                     <div class="policy-icon" style="background:rgba(212,163,115,0.12);color:var(--accent-gold);"><i class="bi bi-calendar-range"></i></div>
                     <div>
-                        <h6>Maksimal Sewa: 14 Hari</h6>
-                        <p>Durasi sewa maksimal 14 hari per transaksi. Perpanjangan bisa diajukan.</p>
+                        <h6>Maksimal Sewa: <?= $policy_max_sewa ?> Hari</h6>
+                        <p>Durasi sewa maksimal <?= $policy_max_sewa ?> hari per transaksi.</p>
+                    </div>
+                </div>
+                <div class="policy-item">
+                    <div class="policy-icon" style="background:rgba(220,53,69,0.1);color:#dc3545;"><i class="bi bi-tools"></i></div>
+                    <div>
+                        <h6>Denda Kerusakan & Kehilangan</h6>
+                        <p>Denda kerusakan ringan: <b><?= $policy_denda_ringan ?>%</b>, rusak berat: <b><?= $policy_denda_berat ?>%</b>, dan hilang: <b><?= $policy_denda_hilang ?>%</b> dari harga ganti barang.</p>
                     </div>
                 </div>
                 <div class="policy-item">
@@ -990,6 +1061,103 @@ function addToWishlist() {
         btn.style.pointerEvents = '';
     });
 }
+
+// ╔══════════════════════════════════════════╗
+//  DENDA POPUP
+// ╚══════════════════════════════════════════╝
+function showDendaPopup(type) {
+    const data = {
+        terlambat: {
+            icon: 'bi-clock-history',
+            color: '#dc3545',
+            bg: 'rgba(220,53,69,0.08)',
+            title: 'Denda Keterlambatan',
+            rate: '<?= $policy_denda_telat ?>% per hari',
+            desc: 'Denda dihitung berdasarkan <b><?= $policy_denda_telat ?>%</b> dari total biaya sewa untuk <b>setiap hari</b> keterlambatan pengembalian.',
+            formula: 'Total Sewa × <?= $policy_denda_telat ?>% × Jumlah Hari Telat',
+            example: 'Contoh: Sewa Rp 100.000, telat 2 hari<br>= Rp 100.000 × <?= $policy_denda_telat ?>% × 2 = <b>Rp <?= number_format(100000 * $policy_denda_telat / 100 * 2, 0, ',', '.') ?></b>'
+        },
+        kerusakan: {
+            icon: 'bi-tools',
+            color: '#D4A373',
+            bg: 'rgba(212,163,115,0.12)',
+            title: 'Denda Kerusakan',
+            rate: '<?= $policy_denda_ringan ?>% - <?= $policy_denda_berat ?>%',
+            desc: 'Denda kerusakan dihitung berdasarkan tingkat kerusakan barang dari <b>harga dasar barang</b>.',
+            formula: '',
+            example: '<div style="display:flex;flex-direction:column;gap:0.5rem;margin-top:0.5rem;">' +
+                '<div style="display:flex;justify-content:space-between;align-items:center;padding:0.5rem 0.75rem;background:rgba(212,163,115,0.06);border-radius:8px;border-left:3px solid #D4A373;">' +
+                    '<div><b>Rusak Ringan</b><br><small style="color:#6B7280">Goresan, noda kecil, dll</small></div>' +
+                    '<div style="font-family:var(--font-mono);font-weight:700;color:#D4A373;"><?= $policy_denda_ringan ?>%</div>' +
+                '</div>' +
+                '<div style="display:flex;justify-content:space-between;align-items:center;padding:0.5rem 0.75rem;background:rgba(220,53,69,0.04);border-radius:8px;border-left:3px solid #dc3545;">' +
+                    '<div><b>Rusak Berat</b><br><small style="color:#6B7280">Patah, sobek, tidak berfungsi</small></div>' +
+                    '<div style="font-family:var(--font-mono);font-weight:700;color:#dc3545;"><?= $policy_denda_berat ?>%</div>' +
+                '</div>' +
+            '</div>'
+        },
+        hilang: {
+            icon: 'bi-box-seam',
+            color: '#ef4444',
+            bg: 'rgba(239,68,68,0.08)',
+            title: 'Denda Kehilangan',
+            rate: '<?= $policy_denda_hilang ?>%',
+            desc: 'Jika barang hilang atau tidak dapat dikembalikan, pelanggan dikenakan denda sebesar <b><?= $policy_denda_hilang ?>%</b> dari harga penggantian barang.',
+            formula: 'Harga Barang × <?= $policy_denda_hilang ?>%',
+            example: 'Contoh: Harga barang Rp 500.000<br>= Rp 500.000 × <?= $policy_denda_hilang ?>% = <b>Rp <?= number_format(500000 * $policy_denda_hilang / 100, 0, ',', '.') ?></b>'
+        }
+    };
+    const d = data[type];
+    if (!d) return;
+
+    const modal = document.getElementById('dendaModal');
+    modal.querySelector('.denda-modal-icon').innerHTML = '<i class="bi ' + d.icon + '"></i>';
+    modal.querySelector('.denda-modal-icon').style.background = d.bg;
+    modal.querySelector('.denda-modal-icon').style.color = d.color;
+    modal.querySelector('.denda-modal-title').textContent = d.title;
+    modal.querySelector('.denda-modal-rate').textContent = d.rate;
+    modal.querySelector('.denda-modal-rate').style.color = d.color;
+    modal.querySelector('.denda-modal-desc').innerHTML = d.desc;
+    
+    const formulaEl = modal.querySelector('.denda-modal-formula');
+    if (d.formula) {
+        formulaEl.style.display = 'block';
+        formulaEl.innerHTML = '<i class="bi bi-calculator me-1"></i> <b>Rumus:</b> ' + d.formula;
+    } else {
+        formulaEl.style.display = 'none';
+    }
+    
+    modal.querySelector('.denda-modal-example').innerHTML = d.example;
+    modal.classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeDendaModal() {
+    const modal = document.getElementById('dendaModal');
+    modal.classList.remove('active');
+    document.body.style.overflow = '';
+}
 </script>
+
+<!-- Denda Detail Popup Modal -->
+<div id="dendaModal" class="denda-modal-overlay" onclick="if(event.target===this)closeDendaModal()">
+    <div class="denda-modal-content" onclick="event.stopPropagation()">
+        <button class="denda-modal-close" onclick="closeDendaModal()"><i class="bi bi-x-lg"></i></button>
+        <div class="denda-modal-icon" style="width:48px;height:48px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:1.3rem;margin:0 auto 1rem;"></div>
+        <h5 class="denda-modal-title" style="font-family:var(--font-heading);font-weight:700;text-align:center;margin-bottom:0.25rem;color:var(--text-primary);"></h5>
+        <div class="denda-modal-rate" style="text-align:center;font-family:var(--font-mono);font-weight:700;font-size:1.1rem;margin-bottom:1rem;"></div>
+        <p class="denda-modal-desc" style="color:var(--text-secondary);font-size:0.88rem;line-height:1.7;margin-bottom:1rem;"></p>
+        <div class="denda-modal-formula" style="background:rgba(45,106,79,0.06);border-radius:10px;padding:0.65rem 1rem;font-size:0.82rem;color:var(--primary-dark);margin-bottom:1rem;font-family:var(--font-mono);"></div>
+        <div class="denda-modal-example" style="background:#F8FAF9;border-radius:10px;padding:0.75rem 1rem;font-size:0.85rem;color:var(--text-primary);line-height:1.7;"></div>
+    </div>
+</div>
+
+<style>
+.denda-modal-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);backdrop-filter:blur(6px);z-index:10002;align-items:center;justify-content:center;padding:1rem;}
+.denda-modal-overlay.active{display:flex;animation:fadeIn 0.25s ease;}
+.denda-modal-content{background:#fff;border-radius:20px;padding:1.75rem;max-width:420px;width:100%;position:relative;box-shadow:0 20px 60px rgba(0,0,0,0.15);animation:fadeInUp 0.35s ease;}
+.denda-modal-close{position:absolute;top:12px;right:14px;background:rgba(107,114,128,0.08);border:none;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;color:var(--text-secondary);cursor:pointer;transition:all 0.2s;}
+.denda-modal-close:hover{background:rgba(220,53,69,0.1);color:#dc3545;}
+</style>
 </body>
 </html>
