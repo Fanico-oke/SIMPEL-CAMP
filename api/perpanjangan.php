@@ -175,7 +175,7 @@ switch ($method) {
             // Validasi input
             if ($reservasi_id <= 0) jsonError('ID reservasi tidak valid');
             if (empty($tanggal_baru)) jsonError('Tanggal baru wajib diisi');
-            if (!in_array($metode_bayar, ['transfer', 'ewallet', 'qris'])) {
+            if (!in_array($metode_bayar, ['transfer', 'qris'])) {
                 jsonError('Metode bayar tidak valid');
             }
 
@@ -224,15 +224,42 @@ switch ($method) {
 
                 $biaya_tambahan = $reservasi['biaya_per_hari'] * $tambahan_hari;
 
+                $bukti_bayar = null;
+                if (($metode_bayar === 'transfer' || $metode_bayar === 'qris') && isset($_FILES['bukti_bayar']) && $_FILES['bukti_bayar']['error'] === 0) {
+                    $uploadDir = dirname(__DIR__) . '/assets/img/pembayaran/';
+                    if (!is_dir($uploadDir)) {
+                        mkdir($uploadDir, 0777, true);
+                    }
+                    $ext = strtolower(pathinfo($_FILES['bukti_bayar']['name'], PATHINFO_EXTENSION));
+                    $allowed = ['jpg', 'jpeg', 'png', 'webp'];
+                    if (!in_array($ext, $allowed)) jsonError('Format bukti bayar tidak didukung (harus JPG/PNG/WEBP)');
+                    
+                    // Validate real mime
+                    $finfo = finfo_open(FILEINFO_MIME_TYPE);
+                    $realMime = finfo_file($finfo, $_FILES['bukti_bayar']['tmp_name']);
+                    finfo_close($finfo);
+                    $allowedMime = ['image/jpeg', 'image/png', 'image/webp'];
+                    if (!in_array($realMime, $allowedMime)) jsonError('File tidak valid (harus berupa gambar)');
+
+                    if ($_FILES['bukti_bayar']['size'] > 2097152) jsonError('Ukuran file maksimal 2MB');
+                    
+                    $filename = 'ext_' . time() . '_' . uniqid() . '.' . $ext;
+                    if (move_uploaded_file($_FILES['bukti_bayar']['tmp_name'], $uploadDir . $filename)) {
+                        $bukti_bayar = $filename;
+                    } else {
+                        jsonError('Gagal mengunggah bukti pembayaran');
+                    }
+                }
+
                 // Insert perpanjangan
                 $stmt = $db->prepare("
                     INSERT INTO perpanjangan (reservasi_id, tanggal_lama, tanggal_baru,
-                        tambahan_hari, biaya_tambahan, metode_bayar, alasan, status)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')
+                        tambahan_hari, biaya_tambahan, metode_bayar, bukti_bayar, alasan, status)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')
                 ");
                 $stmt->execute([
                     $reservasi_id, $tanggal_lama, $tanggal_baru,
-                    $tambahan_hari, $biaya_tambahan, $metode_bayar, $alasan
+                    $tambahan_hari, $biaya_tambahan, $metode_bayar, $bukti_bayar, $alasan
                 ]);
 
                 // Notifikasi ke admin

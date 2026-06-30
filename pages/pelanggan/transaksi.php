@@ -41,11 +41,13 @@ foreach ($allTransaksi as $trx) {
     $riwayat[] = [
         'id'         => $trx['kode_reservasi'] ?? $trx['kode_transaksi'],
         'trx_id'     => (int)$trx['id'],
+        'reservasi_id'=> (int)($trx['reservasi_id'] ?? 0),
         'sewa'       => !empty($trx['tanggal_mulai']) ? date('d M Y', strtotime($trx['tanggal_mulai'])) : date('d M Y', strtotime($trx['created_at'])),
         'kembali'    => !empty($trx['tanggal_selesai']) ? date('d M Y', strtotime($trx['tanggal_selesai'])) : '-',
         'barang'     => $itemNames,
         'barang_list'=> json_encode($barangIds ?? []),
         'total'      => (int)$trx['total_bayar'],
+        'denda'      => (int)($trx['denda'] ?? 0),
         'status'     => $displayStatus,
         'raw_status' => $trx['status'],
         'metode'     => (strtolower($trx['tipe']) === 'walk_in' || strtolower($trx['tipe']) === 'offline') ? 'Offline (Toko)' : ucfirst($trx['tipe'] ?? 'online'),
@@ -61,7 +63,7 @@ $total_pengeluaran = array_sum(array_map(fn($r) => $r['total'], array_filter($ri
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= $page_title ?> - <?= APP_NAME ?></title>
-    <meta name="description" content="Kelola transaksi penyewaan peralatan camping Ã¢â‚¬â€ Perpanjangan dan Riwayat Transaksi di SIMPEL-CAMP">
+    <meta name="description" content="Kelola transaksi penyewaan peralatan camping - Perpanjangan dan Riwayat Transaksi di SIMPEL-CAMP">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
@@ -71,10 +73,10 @@ $total_pengeluaran = array_sum(array_map(fn($r) => $r['total'], array_filter($ri
     <link rel="stylesheet" href="<?= ASSETS_URL ?>/css/dashboard.css?v=1781550666">
     <link rel="stylesheet" href="<?= ASSETS_URL ?>/css/pelanggan-system.css">
     <style>
-    /* Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
-       TRANSAKSI PAGE Ã¢â‚¬â€ Ultra Premium Redesign v2
+    /* ------------------------------------------------------------
+       TRANSAKSI PAGE - Ultra Premium Redesign v2
        Design: #F2F7F4 bg | White cards 20px | NO borders | pill 50px
-       Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â */
+       ------------------------------------------------------------ */
     :root {
         --trx-primary: #2D6A4F;
         --trx-primary-light: #52B788;
@@ -435,7 +437,7 @@ $total_pengeluaran = array_sum(array_map(fn($r) => $r['total'], array_filter($ri
         background: linear-gradient(135deg, rgba(45,106,79,0.02), rgba(82,183,136,0.03));
     }
     .perpanjang-panel.open {
-        max-height: 600px;
+        max-height: 2000px;
         padding: 1.5rem;
     }
     .day-stepper {
@@ -501,30 +503,76 @@ $total_pengeluaran = array_sum(array_map(fn($r) => $r['total'], array_filter($ri
     /* Payment Radio Cards */
     .pay-card-grid {
         display: grid;
-        grid-template-columns: repeat(3, 1fr);
+        grid-template-columns: repeat(2, 1fr);
         gap: 0.75rem;
         margin: 1rem 0;
     }
     .pay-card {
-        border: none;
+        border: 2px solid transparent;
         border-radius: var(--trx-input-radius);
-        padding: 0.9rem;
+        padding: 1rem 0.8rem;
         cursor: pointer;
         text-align: center;
         transition: all 0.3s;
         background: var(--trx-card-bg);
         box-shadow: 0 1px 8px rgba(0,0,0,0.04);
+        position: relative;
     }
     .pay-card:hover {
         box-shadow: 0 4px 15px rgba(0,0,0,0.08);
         transform: translateY(-2px);
     }
     .pay-card.selected {
-        background: linear-gradient(135deg, rgba(45,106,79,0.06), rgba(82,183,136,0.08));
-        box-shadow: 0 0 0 2px var(--trx-primary), 0 4px 15px rgba(45,106,79,0.15);
+        background: linear-gradient(135deg, rgba(45,106,79,0.04), rgba(82,183,136,0.06));
+        border-color: var(--trx-primary);
+        box-shadow: 0 4px 15px rgba(45,106,79,0.15);
     }
-    .pay-card-icon { font-size: 1.5rem; margin-bottom: 0.3rem; }
-    .pay-card-label { font-size: 0.78rem; font-weight: 600; color: #374151; }
+    .pay-card.selected::after {
+        content: '\F26B';
+        font-family: 'bootstrap-icons';
+        position: absolute;
+        top: 6px; right: 6px;
+        font-size: 0.7rem;
+        background: var(--trx-primary);
+        color: #fff;
+        width: 18px; height: 18px;
+        border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+    }
+    .pay-card-icon { font-size: 1.6rem; margin-bottom: 0.35rem; }
+    .pay-card-label { font-size: 0.82rem; font-weight: 700; color: #1F2937; margin-bottom: 0.2rem; }
+    .pay-card-detail { font-size: 0.68rem; color: #6B7280; line-height: 1.3; }
+
+    /* Upload Bukti Section */
+    .upload-bukti-section {
+        margin-top: 1rem;
+    }
+    .upload-bukti-area {
+        border: 2px dashed #D1D5DB;
+        border-radius: 12px;
+        padding: 1rem;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.3s;
+        background: #FAFAFA;
+    }
+    .upload-bukti-area:hover {
+        border-color: var(--trx-primary);
+        background: rgba(45,106,79,0.02);
+    }
+    .upload-bukti-area.has-file {
+        border-color: var(--trx-primary);
+        border-style: solid;
+        background: #F0FDF4;
+    }
+    .upload-bukti-area .upload-icon { font-size: 1.8rem; color: #9CA3AF; }
+    .upload-bukti-area.has-file .upload-icon { color: var(--trx-primary); }
+    .upload-bukti-preview {
+        max-height: 80px;
+        border-radius: 8px;
+        margin-top: 0.5rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
 
     .perpanjang-panel-actions {
         display: flex;
@@ -700,7 +748,7 @@ $total_pengeluaran = array_sum(array_map(fn($r) => $r['total'], array_filter($ri
         color: var(--trx-text);
     }
 
-    /* Status & Metode Tags Ã¢â‚¬â€ Pastel Pills */
+    /* Status & Metode Tags - Pastel Pills */
     .status-badge {
         padding: 0.3em 0.75em;
         border-radius: var(--trx-pill-radius);
@@ -823,7 +871,7 @@ $total_pengeluaran = array_sum(array_map(fn($r) => $r['total'], array_filter($ri
     .empty-state i { font-size: 3.5rem; color: #D1D5DB; margin-bottom: 1rem; }
     .empty-state p { font-family: 'Inter', sans-serif; }
 
-    /* Ã¢â€â‚¬Ã¢â€â‚¬ Modals Ã¢â‚¬â€ Premium Ã¢â€â‚¬Ã¢â€â‚¬ */
+    /* Ã¢â€â‚¬Ã¢â€â‚¬ Modals - Premium Ã¢â€â‚¬Ã¢â€â‚¬ */
     .modal-premium .modal-content {
         border: none;
         border-radius: var(--trx-card-radius);
@@ -1071,9 +1119,9 @@ $total_pengeluaran = array_sum(array_map(fn($r) => $r['total'], array_filter($ri
         <div class="pelanggan-content">
             <div class="container-fluid pb-5">
 
-                <!-- Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â Page Header Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â -->
+                <!-- ----------- Page Header ----------- -->
 
-                <!-- Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â 3 Stat Pills Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â -->
+                <!-- ----------- 3 Stat Pills ----------- -->
                 <div class="stat-pills-row animate-stagger" style="animation-delay:0.1s">
                     <!-- Total Transaksi -->
                     <div class="stat-pill">
@@ -1101,13 +1149,13 @@ $total_pengeluaran = array_sum(array_map(fn($r) => $r['total'], array_filter($ri
                     </div>
                 </div>
 
-                <!-- Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â Premium Pill Tabs Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â -->
+                <!-- ----------- Premium Pill Tabs ----------- -->
                 <div class="premium-tabs animate-stagger" style="animation-delay:0.15s" id="premiumTabs">
                     <div class="premium-tab-indicator" id="tabIndicator"></div>
                     <button class="premium-tab-btn active" data-tab="perpanjangan" onclick="switchTab('perpanjangan')">
-                        <i class="bi bi-arrow-repeat"></i>
-                        <span class="tab-text-full">Perpanjangan</span>
-                        <span class="tab-text-short">Perpanjang</span>
+                        <i class="bi bi-box-seam"></i>
+                        <span class="tab-text-full">Penyewaan Aktif</span>
+                        <span class="tab-text-short">Aktif</span>
                         <span class="tab-badge"><?= count($aktif_rentals) ?></span>
                     </button>
                     <button class="premium-tab-btn" data-tab="riwayat" onclick="switchTab('riwayat')">
@@ -1117,9 +1165,9 @@ $total_pengeluaran = array_sum(array_map(fn($r) => $r['total'], array_filter($ri
                     </button>
                 </div>
 
-                <!-- Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
+                <!-- -----------------------------------
                      TAB 1: PERPANJANGAN
-                     Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â -->
+                     ----------------------------------- -->
                 <div class="tab-panel active" id="panel-perpanjangan">
                     <div class="section-header">
                         <div class="section-header-icon" style="background:#DBEAFE; color:#2563EB;">
@@ -1162,7 +1210,7 @@ $total_pengeluaran = array_sum(array_map(fn($r) => $r['total'], array_filter($ri
                                 <div class="rental-dates">
                                     <i class="bi bi-calendar3"></i>
                                     <?= $rental['sewa'] ?>
-                                    <span class="arrow">Ã¢â€ â€™</span>
+                                    <span class="arrow">-></span>
                                     <?= $rental['kembali'] ?>
                                 </div>
                                 <div class="rental-progress-wrap">
@@ -1178,27 +1226,12 @@ $total_pengeluaran = array_sum(array_map(fn($r) => $r['total'], array_filter($ri
                                     <button class="btn-perpanjang" onclick="togglePanel('<?= $rental['id'] ?>')">
                                         <i class="bi bi-arrow-repeat"></i>Perpanjang
                                     </button>
-                                    <button class="btn-detail-expand" onclick="toggleDetail('<?= $rental['id'] ?>')">
+                                    <button class="btn-detail-expand" onclick="openPengembalianModal('<?= $rental['reservasi_id'] ?>', '<?= $rental['trx_id'] ?>', '<?= $rental['id'] ?>', '<?= htmlspecialchars($rental['barang']) ?>', '<?= $rental['kembali'] ?>')" style="background:var(--trx-primary); color:white; border-color:var(--trx-primary);">
+                                        <i class="bi bi-box-seam"></i>Kembalikan
+                                    </button>
+                                    <button class="btn-detail-expand" onclick="openDetailReservasiModal('<?= $rental['reservasi_id'] ?>')">
                                         <i class="bi bi-info-circle"></i>Detail
                                     </button>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Expandable Detail -->
-                        <div class="rental-expand-detail" id="detail-<?= $rental['id'] ?>">
-                            <div class="row g-3">
-                                <div class="col-sm-4">
-                                    <small style="color:var(--trx-text-muted);" class="d-block">Metode Bayar</small>
-                                    <span class="fw-medium"><?= $rental['metode'] ?></span>
-                                </div>
-                                <div class="col-sm-4">
-                                    <small style="color:var(--trx-text-muted);" class="d-block">Total Sewa</small>
-                                    <span class="fw-bold" style="font-family:'JetBrains Mono',monospace; color:var(--trx-primary);">Rp <?= number_format($rental['total'], 0, ',', '.') ?></span>
-                                </div>
-                                <div class="col-sm-4">
-                                    <small style="color:var(--trx-text-muted);" class="d-block">Status</small>
-                                    <span class="status-badge status-aktif">Aktif</span>
                                 </div>
                             </div>
                         </div>
@@ -1207,13 +1240,23 @@ $total_pengeluaran = array_sum(array_map(fn($r) => $r['total'], array_filter($ri
                         <div class="perpanjang-panel" id="panel-<?= $rental['id'] ?>">
                             <div class="row g-4">
                                 <div class="col-md-5">
-                                    <label class="fw-semibold mb-2 d-block" style="font-size:0.88rem; color:var(--trx-text);">Tambahan Hari</label>
-                                    <div class="day-stepper">
-                                        <button class="stepper-btn" onclick="stepDay('<?= $rental['id'] ?>', -1)">Ã¢Ë†â€™</button>
-                                        <span class="stepper-value" id="days-<?= $rental['id'] ?>" data-days="1">1</span>
-                                        <button class="stepper-btn" onclick="stepDay('<?= $rental['id'] ?>', 1)">+</button>
-                                        <span style="font-size:0.8rem; color:var(--trx-text-muted);">hari<br><small style="color:#9CA3AF;">min 1, max 7</small></span>
-                                    </div>
+                                    <label class="fw-semibold mb-2 d-block" style="font-size:0.88rem; color:var(--trx-text);">Tanggal Kembali Baru</label>
+                                    <?php 
+                                        $kembaliTs = strtotime(str_replace(['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'],['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'], $rental['kembali']));
+                                        $minExtDate = date('Y-m-d', strtotime('+1 day', $kembaliTs));
+                                        $maxExtDate = date('Y-m-d', strtotime('+7 days', $kembaliTs));
+                                    ?>
+                                    <input type="date" class="form-control" 
+                                           id="extDate-<?= $rental['id'] ?>" 
+                                           min="<?= $minExtDate ?>" 
+                                           max="<?= $maxExtDate ?>" 
+                                           value="<?= $minExtDate ?>"
+                                           onchange="updateCostFromDate('<?= $rental['id'] ?>', '<?= date('Y-m-d', $kembaliTs) ?>')"
+                                           style="border-radius:var(--trx-input-radius); padding:0.6rem 0.75rem; border:1px solid #D1D5DB; box-shadow:0 1px 2px rgba(0,0,0,0.05); cursor:pointer;">
+                                    <input type="hidden" id="days-<?= $rental['id'] ?>" data-days="1" value="1">
+                                    <span style="font-size:0.75rem; color:var(--trx-text-muted); display:block; margin-top:0.4rem;">
+                                        Tambahan hari: <span id="daysLabel-<?= $rental['id'] ?>" class="fw-bold text-primary">1</span> hari
+                                    </span>
                                 </div>
                                 <div class="col-md-7">
                                     <div class="cost-display">
@@ -1235,23 +1278,78 @@ $total_pengeluaran = array_sum(array_map(fn($r) => $r['total'], array_filter($ri
 
                             <label class="fw-semibold mb-2 d-block mt-3" style="font-size:0.88rem; color:var(--trx-text);">Metode Pembayaran</label>
                             <div class="pay-card-grid">
-                                <div class="pay-card selected" onclick="selectPayCard(this, '<?= $rental['id'] ?>')">
-                                    <div class="pay-card-icon" style="color:#10B981;"><i class="bi bi-cash-stack"></i></div>
-                                    <div class="pay-card-label">Cash</div>
-                                </div>
-                                <div class="pay-card" onclick="selectPayCard(this, '<?= $rental['id'] ?>')">
+                                <div class="pay-card selected" data-method="transfer" onclick="selectPayCard(this, '<?= $rental['id'] ?>')">
                                     <div class="pay-card-icon" style="color:#3B82F6;"><i class="bi bi-bank"></i></div>
                                     <div class="pay-card-label">Transfer</div>
+                                    <div class="pay-card-detail">Pilihan Multi-Bank</div>
                                 </div>
-                                <div class="pay-card" onclick="selectPayCard(this, '<?= $rental['id'] ?>')">
+                                <div class="pay-card" data-method="qris" onclick="selectPayCard(this, '<?= $rental['id'] ?>')">
                                     <div class="pay-card-icon" style="color:var(--trx-gold);"><i class="bi bi-qr-code"></i></div>
                                     <div class="pay-card-label">QRIS</div>
+                                    <div class="pay-card-detail">Scan QR Code</div>
                                 </div>
+                            </div>
+
+                            <!-- Payment Detail Information -->
+                            <div class="payment-detail-box" id="payDetail-<?= $rental['id'] ?>" style="background:#F9FAFB; border-radius:12px; padding:1rem; margin-bottom:1rem; border:1px solid #E5E7EB;">
+                                <!-- Transfer Info -->
+                                <div id="infoTransfer-<?= $rental['id'] ?>">
+                                    <p class="fw-semibold mb-2" style="font-size:0.85rem; color:#374151;">Transfer ke salah satu rekening berikut:</p>
+                                    <div class="d-flex flex-column gap-2">
+                                        <div class="bank-option selected" onclick="selectBank(this)" style="cursor:pointer; background:white; border:2px solid var(--trx-primary); padding:0.5rem 0.75rem; border-radius:8px; display:flex; justify-content:space-between; align-items:center;">
+                                            <div class="d-flex align-items-center gap-2">
+                                                <div class="bank-radio" style="width:16px; height:16px; border-radius:50%; border:2px solid var(--trx-primary); display:flex; align-items:center; justify-content:center;">
+                                                    <div class="bank-radio-inner" style="width:8px; height:8px; border-radius:50%; background:var(--trx-primary);"></div>
+                                                </div>
+                                                <div><span class="fw-bold text-primary">BCA</span><br><small class="text-muted" style="font-size:0.7rem;">a/n SimpelCamp</small></div>
+                                            </div>
+                                            <span class="fw-bold" style="font-family:monospace; letter-spacing:1px;">1234567890</span>
+                                        </div>
+                                        <div class="bank-option" onclick="selectBank(this)" style="cursor:pointer; background:white; border:1px solid #E5E7EB; padding:0.5rem 0.75rem; border-radius:8px; display:flex; justify-content:space-between; align-items:center;">
+                                            <div class="d-flex align-items-center gap-2">
+                                                <div class="bank-radio" style="width:16px; height:16px; border-radius:50%; border:1px solid #CBD5E1; display:flex; align-items:center; justify-content:center;">
+                                                    <div class="bank-radio-inner" style="width:8px; height:8px; border-radius:50%; background:transparent;"></div>
+                                                </div>
+                                                <div><span class="fw-bold text-primary">Mandiri</span><br><small class="text-muted" style="font-size:0.7rem;">a/n SimpelCamp</small></div>
+                                            </div>
+                                            <span class="fw-bold" style="font-family:monospace; letter-spacing:1px;">0987654321</span>
+                                        </div>
+                                        <div class="bank-option" onclick="selectBank(this)" style="cursor:pointer; background:white; border:1px solid #E5E7EB; padding:0.5rem 0.75rem; border-radius:8px; display:flex; justify-content:space-between; align-items:center;">
+                                            <div class="d-flex align-items-center gap-2">
+                                                <div class="bank-radio" style="width:16px; height:16px; border-radius:50%; border:1px solid #CBD5E1; display:flex; align-items:center; justify-content:center;">
+                                                    <div class="bank-radio-inner" style="width:8px; height:8px; border-radius:50%; background:transparent;"></div>
+                                                </div>
+                                                <div><span class="fw-bold text-primary">BRI</span><br><small class="text-muted" style="font-size:0.7rem;">a/n SimpelCamp</small></div>
+                                            </div>
+                                            <span class="fw-bold" style="font-family:monospace; letter-spacing:1px;">1122334455</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- QRIS Info -->
+                                <div id="infoQris-<?= $rental['id'] ?>" style="display:none; text-align:center;">
+                                    <p class="fw-semibold mb-2" style="font-size:0.85rem; color:#374151;">Scan QR Code di bawah ini:</p>
+                                    <div style="background:white; padding:1rem; border-radius:10px; display:inline-block; border:1px solid #E5E7EB;">
+                                        <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=QRIS_SIMPELCAMP_<?= $rental['id'] ?>" alt="QRIS" style="width:150px; height:150px;">
+                                    </div>
+                                    <p class="small text-muted mt-2 mb-0">Mendukung semua e-wallet & mobile banking</p>
+                                </div>
+                            </div>
+
+                            <!-- Upload Bukti (muncul saat Transfer/QRIS) -->
+                            <div class="upload-bukti-section show" style="margin-top:0;" id="uploadSection-<?= $rental['id'] ?>">
+                                <label class="fw-semibold mb-2 d-block" style="font-size:0.88rem; color:var(--trx-text);"><i class="bi bi-cloud-arrow-up me-1"></i>Upload Bukti Pembayaran <span class="text-danger">*</span></label>
+                                <div class="upload-bukti-area" id="uploadArea-<?= $rental['id'] ?>" onclick="document.getElementById('buktiFile-<?= $rental['id'] ?>').click()">
+                                    <i class="bi bi-image upload-icon d-block"></i>
+                                    <span class="d-block" style="font-size:0.8rem; color:#6B7280;" id="uploadText-<?= $rental['id'] ?>">Klik untuk pilih foto bukti transfer</span>
+                                    <small class="text-muted" style="font-size:0.7rem;">JPG, PNG - Maks 2MB</small>
+                                    <img class="upload-bukti-preview" id="uploadPreview-<?= $rental['id'] ?>" style="display:none;">
+                                </div>
+                                <input type="file" id="buktiFile-<?= $rental['id'] ?>" accept="image/jpeg,image/png,image/webp" style="display:none;" onchange="previewBuktiPerpanjangan(this, '<?= $rental['id'] ?>')">
                             </div>
 
                             <div class="perpanjang-panel-actions">
                                 <button class="btn-cancel-ext" onclick="togglePanel('<?= $rental['id'] ?>')">Batal</button>
-                                <button class="btn-confirm-ext" onclick="openConfirmModal('<?= $rental['id'] ?>', '<?= htmlspecialchars($rental['barang']) ?>', '<?= $rental['kembali'] ?>')">
+                                <button class="btn-confirm-ext" onclick="openConfirmModal('<?= $rental['id'] ?>', '<?= htmlspecialchars($rental['barang']) ?>', '<?= $rental['kembali'] ?>', '<?= $rental['reservasi_id'] ?>')">
                                     <i class="bi bi-check-circle"></i>Konfirmasi Perpanjangan
                                 </button>
                             </div>
@@ -1261,9 +1359,9 @@ $total_pengeluaran = array_sum(array_map(fn($r) => $r['total'], array_filter($ri
                     <?php endif; ?>
                 </div>
 
-                <!-- Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
+                <!-- ───────────────────────────────────────────
                      TAB 2: RIWAYAT TRANSAKSI
-                     Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â -->
+                     ─────────────────────────────────────────── -->
                 <div class="tab-panel" id="panel-riwayat">
                     <div class="section-header">
                         <div class="section-header-icon" style="background:rgba(45,106,79,0.08); color:var(--trx-primary);">
@@ -1300,7 +1398,7 @@ $total_pengeluaran = array_sum(array_map(fn($r) => $r['total'], array_filter($ri
                                     <div class="trx-items"><?= htmlspecialchars($r['barang']) ?></div>
                                     <div class="trx-dates">
                                         <i class="bi bi-calendar3"></i>
-                                        <?= $r['sewa'] ?> <span style="color:var(--trx-primary-light); font-weight:700;">Ã¢â€ â€™</span> <?= $r['kembali'] ?>
+                                        <?= $r['sewa'] ?> <span style="color:var(--trx-primary-light); font-weight:700;">-></span> <?= $r['kembali'] ?>
                                     </div>
                                 </div>
                                 <div class="trx-meta">
@@ -1317,6 +1415,11 @@ $total_pengeluaran = array_sum(array_map(fn($r) => $r['total'], array_filter($ri
                                         <i class="bi bi-wallet2"></i>Bayar
                                     </button>
                                     <?php endif; ?>
+                                    <?php endif; ?>
+                                    <?php if ($r['raw_status'] === 'menunggu_denda'): ?>
+                                    <button class="btn-trx-bayar" style="background:var(--trx-primary);color:#fff;" onclick="openDendaModal(<?= $r['trx_id'] ?>, <?= $r['denda'] ?>, '<?= htmlspecialchars(addslashes($r['barang'])) ?>')">
+                                        <i class="bi bi-exclamation-triangle"></i>Bayar Denda
+                                    </button>
                                     <?php endif; ?>
                                     <button class="btn-trx-nota" onclick="openNotaModal(<?= $r['trx_id'] ?>)">
                                         <i class="bi bi-file-text"></i>Nota
@@ -1340,9 +1443,9 @@ $total_pengeluaran = array_sum(array_map(fn($r) => $r['total'], array_filter($ri
     </div>
 </div>
 
-<!-- Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
+<!-- -------------------------------------------
      MODALS
-     Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â -->
+     ------------------------------------------- -->
 
 <!-- Confirm Perpanjangan Modal -->
 <div class="modal fade modal-premium" id="confirmExtModal" tabindex="-1">
@@ -1379,6 +1482,11 @@ $total_pengeluaran = array_sum(array_map(fn($r) => $r['total'], array_filter($ri
                         <span class="value" id="cTotalCost"></span>
                     </div>
                 </div>
+                <div id="cUploadSection" style="display:none; margin-top:1.25rem;">
+                    <label class="fw-semibold mb-2" style="font-size:0.88rem; color:var(--trx-text);">Upload Bukti Pembayaran <span class="text-danger">*</span></label>
+                    <input type="file" class="form-control" id="cBuktiBayar" accept="image/jpeg, image/png, image/jpg" style="border-radius:var(--trx-input-radius);">
+                    <small class="text-muted d-block mt-1" style="font-size:0.75rem;">Harap unggah bukti transfer / QRIS (Max 2MB)</small>
+                </div>
             </div>
             <div class="modal-footer border-0" style="padding:0.75rem 1.5rem 1.25rem;">
                 <button class="btn-cancel-ext" data-bs-dismiss="modal">Batal</button>
@@ -1404,7 +1512,7 @@ $total_pengeluaran = array_sum(array_map(fn($r) => $r['total'], array_filter($ri
                 <p style="color:var(--trx-text-muted);" class="mb-1">Masa sewa telah diperpanjang untuk:</p>
                 <div class="success-id-display mb-1" id="sRentalId"></div>
                 <p class="small" style="color:var(--trx-text-muted);" id="sInfo"></p>
-                <button class="btn-confirm-ext mt-3" data-bs-dismiss="modal" style="margin:0 auto;">
+                <button class="btn-confirm-ext mt-3" data-bs-dismiss="modal" style="margin:0 auto;" onclick="window.location.reload()">
                     <i class="bi bi-check-lg"></i>Selesai
                 </button>
             </div>
@@ -1412,30 +1520,229 @@ $total_pengeluaran = array_sum(array_map(fn($r) => $r['total'], array_filter($ri
     </div>
 </div>
 
-<!-- Toast Container -->
+<!-- Modal Bayar Denda -->
+<div class="modal fade modal-premium" id="dendaModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold" style="font-family:'Outfit',sans-serif; color:var(--trx-primary);"><i class="bi bi-exclamation-triangle me-2"></i>Pembayaran Denda</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning d-flex gap-3 align-items-center mb-4">
+                    <i class="bi bi-info-circle-fill fs-4"></i>
+                    <div>
+                        <strong>Pesanan <span id="dendaTrxId"></span></strong><br>
+                        Barang: <span id="dendaItems"></span>
+                    </div>
+                </div>
+                <div class="confirm-summary mb-3">
+                    <div class="confirm-row confirm-total">
+                        <span class="label fw-bold">Total Denda</span>
+                        <span class="value" id="dendaTotal"></span>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="fw-semibold mb-2" style="font-size:0.88rem; color:var(--trx-text);">Upload Bukti Pembayaran <span class="text-danger">*</span></label>
+                    <input type="file" class="form-control" id="dendaBukti" accept="image/jpeg, image/png, image/jpg" style="border-radius:var(--trx-input-radius);">
+                    <small class="text-muted d-block mt-1" style="font-size:0.75rem;">Harap unggah bukti transfer denda (Max 2MB)</small>
+                </div>
+            </div>
+            <div class="modal-footer border-0" style="padding:0.75rem 1.5rem 1.25rem;">
+                <button class="btn-cancel-ext" data-bs-dismiss="modal">Batal</button>
+                <button class="btn-confirm-ext" id="btnSubmitDenda" onclick="submitDenda()">
+                    <i class="bi bi-upload"></i>Kirim Bukti
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let _dendaTrxId = 0;
+function openDendaModal(id, denda, items) {
+    _dendaTrxId = id;
+    document.getElementById('dendaTrxId').textContent = 'TRX-' + id;
+    document.getElementById('dendaItems').textContent = items;
+    document.getElementById('dendaTotal').textContent = formatRp(denda);
+    document.getElementById('dendaBukti').value = '';
+    new bootstrap.Modal(document.getElementById('dendaModal')).show();
+}
+
+function submitDenda() {
+    const fileInput = document.getElementById('dendaBukti');
+    if (!fileInput.files || fileInput.files.length === 0) {
+        showToast('Harap unggah foto bukti transfer!', 'bi-exclamation-triangle');
+        return;
+    }
+
+    const btn = document.getElementById('btnSubmitDenda');
+    const origHtml = btn.innerHTML;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Memproses...';
+    btn.disabled = true;
+
+    const formData = new FormData();
+    formData.append('transaksi_id', _dendaTrxId);
+    formData.append('bukti_denda', fileInput.files[0]);
+
+    fetch('<?= BASE_URL ?>/api/pengembalian.php?action=bayar_denda_transfer', {
+        method: 'POST',
+        body: formData
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            bootstrap.Modal.getInstance(document.getElementById('dendaModal')).hide();
+            showToast('Bukti berhasil dikirim!', 'bi-check-circle');
+            setTimeout(() => location.reload(), 1500);
+        } else {
+            alert(data.message || 'Gagal mengirim bukti denda.');
+        }
+    })
+    .catch(error => {
+        alert('Terjadi kesalahan sistem.');
+        console.error(error);
+    })
+    .finally(() => {
+        btn.innerHTML = origHtml;
+        btn.disabled = false;
+    });
+}
+
+function selectBank(el) {
+    // Reset all bank options in this group
+    const group = el.closest('.d-flex.flex-column');
+    group.querySelectorAll('.bank-option').forEach(opt => {
+        opt.classList.remove('selected');
+        opt.style.border = '1px solid #E5E7EB';
+        const radio = opt.querySelector('.bank-radio');
+        radio.style.border = '1px solid #CBD5E1';
+        radio.querySelector('.bank-radio-inner').style.background = 'transparent';
+    });
+    
+    // Select the clicked one
+    el.classList.add('selected');
+    el.style.border = '2px solid var(--trx-primary)';
+    const radio = el.querySelector('.bank-radio');
+    radio.style.border = '2px solid var(--trx-primary)';
+    radio.querySelector('.bank-radio-inner').style.background = 'var(--trx-primary)';
+}
+
+</script>
+
+<!-- Modal Ajukan Pengembalian -->
+<div class="modal fade modal-premium" id="pengembalianModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold" style="font-family:'Outfit',sans-serif;"><i class="bi bi-box-seam me-2"></i>Ajukan Pengembalian</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="confirm-summary mb-3">
+                    <div class="confirm-row">
+                        <span class="label">ID Sewa</span>
+                        <span class="value" id="pRentalId" style="font-family:'JetBrains Mono',monospace;"></span>
+                    </div>
+                    <div class="confirm-row">
+                        <span class="label">Barang</span>
+                        <span class="value" id="pItems"></span>
+                    </div>
+
+                </div>
+                <div id="lateWarningContainer" style="display:none; background:#FEF2F2; border-left:4px solid #EF4444; padding:1rem; border-radius:8px; margin-bottom:1rem;">
+                        <div class="d-flex align-items-center">
+                            <i class="bi bi-exclamation-circle-fill text-danger me-2" style="font-size:1.2rem;"></i>
+                            <div>
+                                <h6 class="mb-1 text-danger fw-bold">Anda Terlambat <span id="lateDays">0</span> Hari</h6>
+                                <p class="mb-0 text-danger" style="font-size:0.85rem;">Denda keterlambatan: <span id="lateFine" class="fw-bold">Rp 0</span>. Denda ini akan ditambahkan ke tagihan setelah admin memeriksa kondisi barang.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                    <label class="fw-semibold mb-2" style="font-size:0.88rem; color:var(--trx-text);">Upload Foto Barang Saat Ini <span class="text-danger">*</span></label>
+                    <input type="file" class="form-control" id="pFotoBarang" accept="image/jpeg, image/png, image/jpg" style="border-radius:var(--trx-input-radius);">
+                    <small class="text-muted d-block mt-1" style="font-size:0.75rem;">Unggah foto barang yang ingin dikembalikan untuk pengecekan admin (Max 2MB).</small>
+                </div>
+            </div>
+            <div class="modal-footer border-0" style="padding:0.75rem 1.5rem 1.25rem;">
+                <button class="btn-cancel-ext" data-bs-dismiss="modal">Batal</button>
+                <button class="btn-confirm-ext" id="btnSubmitPengembalian" onclick="submitPengembalian()" style="background:var(--trx-primary);">
+                    <i class="bi bi-upload"></i>Ajukan Sekarang
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 
 <!-- Toast Container -->
 <div class="toast-container-custom" id="toastBox"></div>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-/* Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
-   TRANSAKSI PAGE Ã¢â‚¬â€ JavaScript v2
-   Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â */
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+   TRANSAKSI PAGE -- JavaScript v2
+   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -  */
 
-// Ã¢â€â‚¬Ã¢â€â‚¬ Utility Ã¢â€â‚¬Ã¢â€â‚¬
+// --------------------------
+// Utility
+// --------------------------
 function formatRp(n) {
     return 'Rp ' + n.toLocaleString('id-ID');
 }
 
-// Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
+// --------------------------
+// Toast System
+// --------------------------
+function showToast(msg, icon) {
+    const box = document.getElementById('toastBox');
+    if (!box) return;
+    const toast = document.createElement('div');
+    toast.className = 'toast-custom';
+    toast.innerHTML = `<span class="toast-icon"><i class="bi ${icon || 'bi-info-circle'}"></i></span>${msg}`;
+    box.appendChild(toast);
+    setTimeout(() => {
+        toast.classList.add('hiding');
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
+}
+
+// --------------------------
+// Copy ID
+// --------------------------
+function copyId(id) {
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(id).then(() => {
+            showToast('ID ' + id + ' berhasil disalin!', 'bi-clipboard-check');
+        }).catch(() => { fallbackCopy(id); });
+    } else {
+        fallbackCopy(id);
+    }
+}
+
+function fallbackCopy(text) {
+    var textArea = document.createElement("textarea");
+    textArea.value = text;
+    textArea.style.position = "fixed";
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    try {
+        if (document.execCommand('copy'))
+            showToast('ID ' + text + ' berhasil disalin!', 'bi-clipboard-check');
+        else alert('Gagal menyalin kode');
+    } catch (err) { alert('Gagal menyalin kode'); }
+    document.body.removeChild(textArea);
+}
+
+// --------------------------
 // Tab Switching with Sliding Indicator
-// Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
+// --------------------------
 function switchTab(tab) {
     document.querySelectorAll('.premium-tab-btn').forEach(b => b.classList.remove('active'));
     document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
     const btn = document.querySelector(`.premium-tab-btn[data-tab="${tab}"]`);
-    btn.classList.add('active');
+    if(btn) btn.classList.add('active');
     document.getElementById('panel-' + tab).classList.add('active');
     updateIndicator();
     if (tab === 'riwayat') animateTrxCards();
@@ -1451,9 +1758,9 @@ function updateIndicator() {
     }
 }
 
-// Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
+// - - - - - - - - - - - - - - - - - - - - - - - - - - 
 // Perpanjangan Panel (slide-down)
-// Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
+// - - - - - - - - - - - - - - - - - - - - - - - - - - 
 function togglePanel(id) {
     const panel = document.getElementById('panel-' + id);
     panel.classList.toggle('open');
@@ -1465,26 +1772,56 @@ function toggleDetail(id) {
 }
 
 function stepDay(id, delta) {
+    // legacy function kept for safety
     const el = document.getElementById('days-' + id);
-    let val = parseInt(el.dataset.days) + delta;
-    val = Math.max(1, Math.min(7, val));
-    el.dataset.days = val;
-    el.textContent = val;
-    // Animate the value change
-    el.style.transform = 'scale(1.2)';
-    setTimeout(() => el.style.transform = 'scale(1)', 150);
-    updateCost(id, val);
+    if(el) {
+        let val = parseInt(el.dataset.days) + delta;
+        val = Math.max(1, Math.min(7, val));
+        el.dataset.days = val;
+        updateCost(id, val);
+    }
+}
+
+function updateCostFromDate(id, originalDateStr) {
+    const input = document.getElementById('extDate-' + id);
+    const origDate = new Date(originalDateStr);
+    const newDate = new Date(input.value);
+    
+    // Calculate difference in days
+    const diffTime = newDate.getTime() - origDate.getTime();
+    let diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    // Fallback if invalid
+    if (isNaN(diffDays) || diffDays < 1) {
+        input.value = input.min;
+        diffDays = 1;
+    }
+    
+    // Update the hidden days element
+    const daysEl = document.getElementById('days-' + id);
+    if(daysEl) daysEl.dataset.days = diffDays;
+    
+    const daysLabel = document.getElementById('daysLabel-' + id);
+    if(daysLabel) daysLabel.textContent = diffDays;
+    
+    // Call the original updateCost function
+    updateCost(id, diffDays);
 }
 
 function updateCost(id, days) {
     const costEl = document.getElementById('extCost-' + id);
     const daily = parseInt(costEl.dataset.daily);
     const total = daily * days;
-    costEl.textContent = formatRp(total);
+    
+    // Set cost attribute for calculation, and innerHTML for display
+    costEl.dataset.total = total;
+    costEl.innerHTML = `<span style="font-size:0.8rem; color:var(--trx-text-muted); font-weight:normal; margin-right:8px;">(${days}x ${formatRp(daily)})</span>${formatRp(total)}`;
+    
     // Flash animation
     costEl.style.color = '#2D6A4F';
     costEl.style.transform = 'scale(1.05)';
     setTimeout(() => {
+        costEl.style.color = 'var(--trx-primary)';
         costEl.style.transform = 'scale(1)';
     }, 200);
 }
@@ -1492,20 +1829,85 @@ function updateCost(id, days) {
 function selectPayCard(el, rentalId) {
     el.closest('.pay-card-grid').querySelectorAll('.pay-card').forEach(c => c.classList.remove('selected'));
     el.classList.add('selected');
+
+    const method = el.dataset.method;
+    
+    // Toggle info boxes
+    const infoTransfer = document.getElementById('infoTransfer-' + rentalId);
+    const infoQris = document.getElementById('infoQris-' + rentalId);
+    
+    if (infoTransfer && infoQris) {
+        if (method === 'transfer') {
+            infoTransfer.style.display = 'block';
+            infoQris.style.display = 'none';
+        } else if (method === 'qris') {
+            infoTransfer.style.display = 'none';
+            infoQris.style.display = 'block';
+        }
+    }
 }
 
-// Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
-// Confirm Modal
-// Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
-let _confirmRentalId = '';
+function previewBuktiPerpanjangan(input, rentalId) {
+    const area = document.getElementById('uploadArea-' + rentalId);
+    const text = document.getElementById('uploadText-' + rentalId);
+    const preview = document.getElementById('uploadPreview-' + rentalId);
+    if (input.files && input.files[0]) {
+        const file = input.files[0];
+        if (file.size > 2 * 1024 * 1024) {
+            showToast('File terlalu besar! Maksimal 2MB.', 'bi-exclamation-triangle');
+            input.value = '';
+            return;
+        }
+        text.textContent = file.name;
+        area.classList.add('has-file');
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            preview.src = e.target.result;
+            preview.style.display = 'block';
+        };
+        reader.readAsDataURL(file);
+    }
+}
 
-function openConfirmModal(id, items, origDate) {
+// - - - - - - - - - - - - - - - - - - - - - - - - - - 
+// Confirm Modal
+// - - - - - - - - - - - - - - - - - - - - - - - - - - 
+let _confirmRentalId = '';
+let _confirmReservasiId = '';
+let _confirmTanggalBaru = '';
+
+function openConfirmModal(id, items, origDate, reservasiId) {
     _confirmRentalId = id;
-    const days = document.getElementById('days-' + id).dataset.days;
-    const cost = document.getElementById('extCost-' + id).textContent;
+    _confirmReservasiId = reservasiId;
+
+    const days = parseInt(document.getElementById('days-' + id).dataset.days);
+    const costEl = document.getElementById('extCost-' + id);
+    const costTotal = costEl.dataset.total ? parseInt(costEl.dataset.total) : parseInt(costEl.dataset.daily) * days;
+    const cost = formatRp(costTotal);
+    
     const panel = document.getElementById('panel-' + id);
     const selectedPay = panel.querySelector('.pay-card.selected .pay-card-label');
     const payMethod = selectedPay ? selectedPay.textContent : 'Cash';
+
+    // Parse origDate (d M Y) and add days
+    // Assume origDate format is 'd M Y' e.g. '01 Jul 2026'
+    // To be safe, let's fetch raw date or parse correctly.
+    const monthMap = { 'Jan':0, 'Feb':1, 'Mar':2, 'Apr':3, 'Mei':4, 'Jun':5, 'Jul':6, 'Agu':7, 'Sep':8, 'Okt':9, 'Nov':10, 'Des':11 };
+    const parts = origDate.split(' ');
+    let dateObj = new Date();
+    if(parts.length === 3) {
+        dateObj = new Date(parts[2], monthMap[parts[1]] || 0, parts[0]);
+    }
+    dateObj.setDate(dateObj.getDate() + days);
+    let newDateStr = dateObj.getFullYear() + '-' + String(dateObj.getMonth() + 1).padStart(2, '0') + '-' + String(dateObj.getDate()).padStart(2, '0');
+    
+    // Check if we have the explicit calendar input
+    const dateInput = document.getElementById('extDate-' + id);
+    if(dateInput && dateInput.value) {
+        newDateStr = dateInput.value;
+    }
+    
+    _confirmTanggalBaru = newDateStr;
 
     document.getElementById('cRentalId').textContent = id;
     document.getElementById('cItems').textContent = items;
@@ -1514,32 +1916,183 @@ function openConfirmModal(id, items, origDate) {
     document.getElementById('cPayMethod').textContent = payMethod;
     document.getElementById('cTotalCost').textContent = cost;
 
+    // Check if bukti was already uploaded in the panel
+    const panelFileInput = document.getElementById('buktiFile-' + id);
+    const confirmUploadSec = document.getElementById('cUploadSection');
+    if (payMethod.toLowerCase() === 'transfer' || payMethod.toLowerCase() === 'qris') {
+        if (panelFileInput && panelFileInput.files && panelFileInput.files.length > 0) {
+            // Already uploaded in panel, show filename in confirm modal
+            confirmUploadSec.style.display = 'block';
+            confirmUploadSec.innerHTML = '<div class="d-flex align-items-center gap-2 p-2" style="background:#F0FDF4; border-radius:10px; border:1px solid #BBF7D0;">' +
+                '<i class="bi bi-check-circle-fill" style="color:var(--trx-primary); font-size:1.1rem;"></i>' +
+                '<div><small class="fw-semibold d-block" style="color:var(--trx-primary);">Bukti sudah diunggah</small>' +
+                '<small class="text-muted">' + panelFileInput.files[0].name + '</small></div></div>';
+        } else {
+            // Not yet uploaded, show upload input in modal
+            confirmUploadSec.style.display = 'block';
+            confirmUploadSec.innerHTML = '<label class="fw-semibold mb-2" style="font-size:0.88rem; color:var(--trx-text);">Upload Bukti Pembayaran <span class="text-danger">*</span></label>' +
+                '<input type="file" class="form-control" id="cBuktiBayar" accept="image/jpeg, image/png, image/jpg" style="border-radius:var(--trx-input-radius);">' +
+                '<small class="text-muted d-block mt-1" style="font-size:0.75rem;">Harap unggah bukti transfer / QRIS (Max 2MB)</small>';
+        }
+    } else {
+        confirmUploadSec.style.display = 'none';
+    }
+
     new bootstrap.Modal(document.getElementById('confirmExtModal')).show();
 }
 
-// Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
+// - - - - - - - - - - - - - - - - - - - - - - - - - - 
 // Submit Extension -> Success Modal + Confetti
-// Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
+// - - - - - - - - - - - - - - - - - - - - - - - - - - 
 function submitExtension() {
     const id = _confirmRentalId;
     const days = document.getElementById('cDays').textContent;
     const cost = document.getElementById('cTotalCost').textContent;
+    const payMethod = document.getElementById('cPayMethod').textContent.toLowerCase();
+    
+    // Check bukti from panel first, then fallback to confirm modal
+    const panelFileInput = document.getElementById('buktiFile-' + id);
+    const modalFileInput = document.getElementById('cBuktiBayar');
+    let buktiFile = null;
+    
+    if (panelFileInput && panelFileInput.files && panelFileInput.files.length > 0) {
+        buktiFile = panelFileInput.files[0];
+    } else if (modalFileInput && modalFileInput.files && modalFileInput.files.length > 0) {
+        buktiFile = modalFileInput.files[0];
+    }
 
-    bootstrap.Modal.getInstance(document.getElementById('confirmExtModal')).hide();
+    if ((payMethod === 'transfer' || payMethod === 'qris') && !buktiFile) {
+        showToast('Harap unggah bukti pembayaran!', 'bi-exclamation-triangle');
+        return;
+    }
 
-    setTimeout(() => {
-        document.getElementById('sRentalId').textContent = id;
-        document.getElementById('sInfo').textContent = 'Diperpanjang ' + days + ' Ã¢â‚¬â€ ' + cost;
-        const modal = new bootstrap.Modal(document.getElementById('successModal'));
-        modal.show();
-        spawnConfetti();
-        showToast('Perpanjangan berhasil diajukan!', 'bi-check-circle');
-    }, 350);
+    const btn = document.querySelector('#confirmExtModal .btn-confirm-ext');
+    const origHtml = btn.innerHTML;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Memproses...';
+    btn.disabled = true;
+
+    const formData = new FormData();
+    formData.append('reservasi_id', _confirmReservasiId);
+    formData.append('tanggal_baru', _confirmTanggalBaru);
+    formData.append('metode_bayar', payMethod);
+    if (buktiFile) {
+        formData.append('bukti_bayar', buktiFile);
+    }
+
+    fetch('<?= BASE_URL ?>/api/perpanjangan.php?action=create', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            bootstrap.Modal.getInstance(document.getElementById('confirmExtModal')).hide();
+            setTimeout(() => {
+                document.getElementById('sRentalId').textContent = id;
+                document.getElementById('sInfo').textContent = 'Diperpanjang ' + days + ' - ' + cost;
+                const modal = new bootstrap.Modal(document.getElementById('successModal'));
+                modal.show();
+                spawnConfetti();
+                showToast('Perpanjangan berhasil diajukan!', 'bi-check-circle');
+            }, 350);
+        } else {
+            bootstrap.Modal.getInstance(document.getElementById('confirmExtModal')).hide();
+            setTimeout(() => {
+                showToast(data.message || 'Gagal mengajukan perpanjangan.', 'bi-exclamation-circle');
+            }, 350);
+        }
+    })
+    .catch(error => {
+        bootstrap.Modal.getInstance(document.getElementById('confirmExtModal')).hide();
+        setTimeout(() => {
+            showToast('Terjadi kesalahan sistem.', 'bi-exclamation-circle');
+        }, 350);
+        console.error(error);
+    })
+    .finally(() => {
+        btn.innerHTML = origHtml;
+        btn.disabled = false;
+    });
 }
 
-// Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
+// ---------------------------------------------------------
+// PENGEMBALIAN LOGIC
+// ---------------------------------------------------------
+let _returnReservasiId = '';
+
+async function openPengembalianModal(reservasiId, trxId, kode, items, kembali) {
+    _returnReservasiId = reservasiId;
+    document.getElementById('pRentalId').textContent = kode;
+    document.getElementById('pItems').textContent = items;
+    document.getElementById('pFotoBarang').value = '';
+    
+    // Hide warning by default
+    document.getElementById('lateWarningContainer').style.display = 'none';
+    
+    // Show modal first so it doesn't wait
+    new bootstrap.Modal(document.getElementById('pengembalianModal')).show();
+    
+    try {
+        // Cek denda via hitung_denda
+        const response = await fetch('<?= BASE_URL ?>/api/pengembalian.php?action=hitung_denda', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ transaksi_id: trxId, tanggal_kembali: new Date().toISOString().split('T')[0] })
+        });
+        const res = await response.json();
+        if(res.status === 'success' && res.data.hari_terlambat > 0) {
+            document.getElementById('lateDays').textContent = res.data.hari_terlambat;
+            document.getElementById('lateFine').textContent = formatRp(res.data.denda_keterlambatan);
+            document.getElementById('lateWarningContainer').style.display = 'block';
+        }
+    } catch(err) {
+        console.error("Gagal mengecek denda:", err);
+    }
+}
+
+function submitPengembalian() {
+    const fileInput = document.getElementById('pFotoBarang');
+    if (!fileInput.files || fileInput.files.length === 0) {
+        showToast('Harap unggah foto kondisi barang!', 'bi-exclamation-triangle');
+        return;
+    }
+
+    const btn = document.getElementById('btnSubmitPengembalian');
+    const origHtml = btn.innerHTML;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Memproses...';
+    btn.disabled = true;
+
+    const formData = new FormData();
+    formData.append('reservasi_id', _returnReservasiId);
+    formData.append('bukti_foto', fileInput.files[0]);
+
+    fetch('<?= BASE_URL ?>/api/pengembalian.php?action=ajukan', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            bootstrap.Modal.getInstance(document.getElementById('pengembalianModal')).hide();
+            showToast('Pengembalian berhasil diajukan!', 'bi-check-circle');
+            setTimeout(() => window.location.reload(), 1500);
+        } else {
+            alert(data.message || 'Gagal mengajukan pengembalian.');
+        }
+    })
+    .catch(error => {
+        alert('Terjadi kesalahan sistem.');
+        console.error(error);
+    })
+    .finally(() => {
+        btn.innerHTML = origHtml;
+        btn.disabled = false;
+    });
+}
+
+// - - - - - - - - - - - - - - - - - - - - - - - - - - 
 // Confetti Animation
-// Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
+// - - - - - - - - - - - - - - - - - - - - - - - - - - 
 function spawnConfetti() {
     const body = document.getElementById('successBody');
     const colors = ['#52B788', '#2D6A4F', '#E9C46A', '#D4A373', '#3B82F6', '#F59E0B', '#EF4444', '#8B5CF6'];
@@ -1558,9 +2111,9 @@ function spawnConfetti() {
     }
 }
 
-// Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
+// --------------------------
 // Riwayat Filter
-// Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
+// --------------------------
 function filterCards(status, btn) {
     document.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
     btn.classList.add('active');
@@ -1596,9 +2149,9 @@ function animateTrxCards() {
     });
 }
 
-// Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
+// --------------------------
 // Detail Modal (Riwayat) with Timeline
-// Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
+// --------------------------
 function showDetailModal(id, trxId, sewa, kembali, barang, total, status, metode) {
     document.getElementById('dId').textContent = id;
     document.getElementById('dBarang').textContent = barang;
@@ -1633,7 +2186,7 @@ function showDetailModal(id, trxId, sewa, kembali, barang, total, status, metode
         dot3.classList.add('current');
         label3.classList.add('current');
         document.getElementById('dDate3').textContent = sewa;
-        document.getElementById('dDate4').textContent = 'Ã¢â‚¬â€';
+        document.getElementById('dDate4').textContent = '-';
     } else if (isSelesai) {
         dot3.classList.add('done');
         dot4.classList.add('done');
@@ -1642,37 +2195,16 @@ function showDetailModal(id, trxId, sewa, kembali, barang, total, status, metode
         document.getElementById('dDate3').textContent = sewa;
         document.getElementById('dDate4').textContent = kembali;
     } else {
-        document.getElementById('dDate3').textContent = 'Ã¢â‚¬â€';
-        document.getElementById('dDate4').textContent = 'Ã¢â‚¬â€';
+        document.getElementById('dDate3').textContent = '-';
+        document.getElementById('dDate4').textContent = '-';
     }
 
     new bootstrap.Modal(document.getElementById('detailModal')).show();
 }
 
-// Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
-// Copy ID & Toast System
-// Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
-function copyId(id) {
-    navigator.clipboard.writeText(id).then(() => {
-        showToast('ID ' + id + ' berhasil disalin!', 'bi-clipboard-check');
-    });
-}
-
-function showToast(msg, icon) {
-    const box = document.getElementById('toastBox');
-    const toast = document.createElement('div');
-    toast.className = 'toast-custom';
-    toast.innerHTML = `<span class="toast-icon"><i class="bi ${icon || 'bi-info-circle'}"></i></span>${msg}`;
-    box.appendChild(toast);
-    setTimeout(() => {
-        toast.classList.add('hiding');
-        setTimeout(() => toast.remove(), 300);
-    }, 3000);
-}
-
-// Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
+// --------------------------
 // Init
-// Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
+// --------------------------
 document.addEventListener('DOMContentLoaded', () => {
     updateIndicator();
     window.addEventListener('resize', updateIndicator);
@@ -1690,7 +2222,9 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }, 300);
 });
+
 </script>
+
 <!-- Payment Modal -->
 <div class="modal fade modal-premium" id="payModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
@@ -1834,91 +2368,7 @@ function submitPayment() {
     });
 }
 
-function openReturnModal(trxId, kodeRsv) {
-    document.getElementById('returnTrxId').value = trxId;
-    document.getElementById('returnTrxCode').value = kodeRsv;
-    document.getElementById('returnForm').reset();
-    new bootstrap.Modal(document.getElementById('returnModal')).show();
-}
 
-async function submitReturn(e) {
-    e.preventDefault();
-    const btn = document.getElementById('btnSubmitReturn');
-    const form = e.target;
-    
-    btn.disabled = true;
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Mengirim...';
-
-    const formData = new FormData(form);
-    
-    try {
-        const response = await fetch('<?= BASE_URL ?>/api/pengembalian.php?action=ajukan', {
-            method: 'POST',
-            body: formData
-        });
-        const res = await response.json();
-        
-        if (res.status === 'success') {
-            bootstrap.Modal.getInstance(document.getElementById('returnModal')).hide();
-            
-            // Show Success Modal
-            document.getElementById('successBody').innerHTML = `
-                <div class="success-icon"><i class="bi bi-check-lg"></i></div>
-                <h4 class="fw-bold text-dark mt-3 mb-2">Pengajuan Berhasil</h4>
-                <div class="success-desc">Foto bukti telah dikirim. Silakan tunggu admin melakukan pengecekan fisik barang.</div>
-            `;
-            const sModal = new bootstrap.Modal(document.getElementById('successModal'));
-            sModal.show();
-            
-            setTimeout(() => location.reload(), 2500);
-        } else {
-            alert(res.message || 'Gagal mengajukan pengembalian');
-        }
-    } catch (err) {
-        alert('Terjadi kesalahan jaringan.');
-    } finally {
-        btn.disabled = false;
-        btn.innerHTML = '<i class="bi bi-cloud-upload me-2"></i>Kirim Pengajuan';
-    }
-}
-
-function openDendaModal(trxId, kodeRsv) {
-    document.getElementById('dendaTrxId').value = trxId;
-    document.getElementById('dendaForm').reset();
-    new bootstrap.Modal(document.getElementById('dendaModal')).show();
-}
-
-async function submitDenda(e) {
-    e.preventDefault();
-    const btn = document.getElementById('btnSubmitDenda');
-    const form = e.target;
-    
-    btn.disabled = true;
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Mengirim...';
-
-    const formData = new FormData(form);
-    
-    try {
-        const response = await fetch('<?= BASE_URL ?>/api/pembayaran.php?action=bayar_denda', {
-            method: 'POST',
-            body: formData
-        });
-        const res = await response.json();
-        
-        if (res.status === 'success') {
-            bootstrap.Modal.getInstance(document.getElementById('dendaModal')).hide();
-            alert('Bukti pembayaran denda berhasil dikirim. Menunggu verifikasi admin.');
-            location.reload();
-        } else {
-            alert(res.message || 'Gagal mengirim pembayaran denda');
-        }
-    } catch (err) {
-        alert('Terjadi kesalahan jaringan.');
-    } finally {
-        btn.disabled = false;
-        btn.innerHTML = '<i class="bi bi-send me-2"></i>Kirim Bukti Pembayaran';
-    }
-}
 let currentReviewTrxId = null;
 
 function openReviewModal(trxId, barangListStr) {
@@ -1992,77 +2442,79 @@ async function submitReview(e) {
         btn.innerHTML = '<i class="bi bi-send me-2"></i>Kirim Ulasan';
     }
 }
+
+async function openDetailReservasiModal(rsvId) {
+    try {
+        const res = await fetch('<?= BASE_URL ?>/api/reservasi.php?action=detail&id=' + rsvId);
+        const data = await res.json();
+        if (data.status === 'success') {
+            const r = data.data;
+            document.getElementById('mDetailKode').textContent = r.kode_reservasi;
+            document.getElementById('mDetailTglSewa').textContent = r.tanggal_mulai;
+            document.getElementById('mDetailTglKembali').textContent = r.tanggal_selesai;
+            document.getElementById('mDetailBiaya').textContent = 'Rp ' + parseInt(r.total_biaya).toLocaleString('id-ID');
+            document.getElementById('mDetailCatatan').textContent = r.catatan || '-';
+            
+            let html = '';
+            r.items.forEach(item => {
+                html += `<div class="d-flex justify-content-between mb-2 pb-2 border-bottom">
+                    <span>${item.nama_barang} <span class="badge bg-secondary ms-1">x${item.jumlah}</span></span>
+                    <span class="fw-medium">Rp ${parseInt(item.subtotal).toLocaleString('id-ID')}</span>
+                </div>`;
+            });
+            document.getElementById('mDetailItems').innerHTML = html;
+            
+            new bootstrap.Modal(document.getElementById('detailReservasiModal')).show();
+        } else {
+            alert('Gagal mengambil detail reservasi: ' + data.message);
+        }
+    } catch (err) {
+        alert('Terjadi kesalahan jaringan.');
+    }
+}
+
 </script>
 
-<!-- Modal Ajukan Pengembalian -->
-<div class="modal fade modal-premium" id="returnModal" tabindex="-1">
+
+<!-- Detail Reservasi Modal (Aktif) -->
+<div class="modal fade modal-premium" id="detailReservasiModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title fw-bold" style="font-family:'Outfit',sans-serif;"><i class="bi bi-box-arrow-in-left me-2"></i>Ajukan Pengembalian</h5>
+                <h5 class="modal-title fw-bold"><i class="bi bi-card-list me-2"></i>Detail Penyewaan</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body">
-                <p class="text-muted mb-4" style="font-size:0.9rem;">Pastikan kondisi barang sesuai dengan saat Anda menyewanya. Silakan unggah foto barang sebelum mengembalikannya.</p>
-                <form id="returnForm" onsubmit="submitReturn(event)">
-                    <input type="hidden" id="returnTrxId" name="reservasi_id">
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">ID Transaksi</label>
-                        <input type="text" id="returnTrxCode" class="form-control" readonly style="background:#f8f9fa;">
-                    </div>
-                    <div class="mb-4">
-                        <label class="form-label fw-bold">Foto Kondisi Barang <span class="text-danger">*</span></label>
-                        <input type="file" class="form-control" name="bukti_foto" accept="image/jpeg, image/png, image/webp" required>
-                        <div class="form-text">Format: JPG, PNG, WebP. Maks 5MB.</div>
-                    </div>
-                    <div class="d-grid">
-                        <button type="submit" class="btn btn-primary" id="btnSubmitReturn" style="border-radius:12px; padding:0.8rem; background:var(--trx-sage); border:none;">
-                            <i class="bi bi-cloud-upload me-2"></i>Kirim Pengajuan
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Modal Bayar Denda -->
-<div class="modal fade modal-premium" id="dendaModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header" style="background: linear-gradient(135deg, #EF4444, #B91C1C);">
-                <h5 class="modal-title fw-bold" style="font-family:'Outfit',sans-serif;"><i class="bi bi-exclamation-triangle me-2"></i>Pembayaran Denda</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <div class="alert alert-danger mb-4" style="border-radius:12px; border:none; background:#FEF2F2; color:#991B1B;">
-                    <i class="bi bi-info-circle me-2"></i>Terdapat denda (keterlambatan/kerusakan) pada transaksi ini. Silakan lunasi untuk menyelesaikan pesanan Anda.
+            <div class="modal-body p-4">
+                <div class="mb-4 text-center">
+                    <small class="text-muted d-block mb-1">Kode Reservasi</small>
+                    <span class="fw-bold" id="mDetailKode" style="font-size:1.3rem; color:var(--trx-primary); padding: 5px 15px; background: #e0f2fe; border-radius: 8px;"></span>
                 </div>
-                <form id="dendaForm" onsubmit="submitDenda(event)">
-                    <input type="hidden" id="dendaTrxId" name="transaksi_id">
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Metode Pembayaran</label>
-                        <select class="form-select" name="metode" required style="border-radius:10px;">
-                            <option value="">Pilih Metode...</option>
-                            <option value="transfer">Transfer Bank (BCA 123456789 a/n SimpelCamp)</option>
-                            <option value="ewallet">E-Wallet (Gopay/OVO: 081333715914)</option>
-                            <option value="qris">QRIS (Scan di Toko)</option>
-                        </select>
+                <div class="row mb-4">
+                    <div class="col-6 text-center">
+                        <small class="text-muted d-block mb-1">Tanggal Sewa</small>
+                        <span class="fw-medium" id="mDetailTglSewa"></span>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Bukti Transfer <span class="text-danger">*</span></label>
-                        <input type="file" class="form-control" name="bukti_bayar" accept="image/jpeg, image/png, image/webp" required>
+                    <div class="col-6 text-center">
+                        <small class="text-muted d-block mb-1">Tanggal Kembali</small>
+                        <span class="fw-medium text-danger" id="mDetailTglKembali"></span>
                     </div>
-                    <div class="mb-4">
-                        <label class="form-label fw-bold">Catatan (Opsional)</label>
-                        <textarea class="form-control" name="catatan" rows="2" style="border-radius:10px;"></textarea>
+                </div>
+                
+                <div class="mb-3">
+                    <small class="text-muted d-block mb-2 fw-bold">Daftar Barang yang Disewa:</small>
+                    <div id="mDetailItems" class="p-3 bg-light rounded border">
                     </div>
-                    <div class="d-grid">
-                        <button type="submit" class="btn btn-danger" id="btnSubmitDenda" style="border-radius:12px; padding:0.8rem; background:#DC2626; border:none;">
-                            <i class="bi bi-send me-2"></i>Kirim Bukti Pembayaran
-                        </button>
-                    </div>
-                </form>
+                </div>
+                
+                <div class="mt-3 p-3" style="background:#f8f9fa; border-radius:8px;">
+                    <small class="text-muted d-block mb-1">Catatan Pesanan:</small>
+                    <div id="mDetailCatatan" class="fst-italic text-secondary" style="font-size:0.9rem;"></div>
+                </div>
+
+                <div class="d-flex justify-content-between align-items-center mt-4 pt-3 border-top">
+                    <span class="text-muted fw-bold">Total Biaya</span>
+                    <span class="fw-bold fs-4 text-primary" id="mDetailBiaya"></span>
+                </div>
             </div>
         </div>
     </div>
@@ -2150,6 +2602,8 @@ function openNotaFromDetail() {
     setTimeout(function() { openNotaModal(trxId); }, 400);
 }
 </script>
-
 </body>
 </html>
+
+
+

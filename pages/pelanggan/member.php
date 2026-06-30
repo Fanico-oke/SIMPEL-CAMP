@@ -92,7 +92,7 @@ foreach ($riwayatList as $hi) {
 }
 
 // Load Kupon Saya
-$stmtKupon = Database::getInstance()->prepare("SELECT * FROM promo WHERE kode_promo LIKE ? ORDER BY batas_waktu DESC");
+$stmtKupon = Database::getInstance()->prepare("SELECT * FROM promo WHERE kode LIKE ? ORDER BY selesai DESC");
 $stmtKupon->execute(["RWD-" . $_SESSION['user_id'] . "-%"]);
 $kupon_saya = $stmtKupon->fetchAll();
 ?>
@@ -1024,11 +1024,11 @@ $kupon_saya = $stmtKupon->fetchAll();
                     <div class="mp-card" style="padding: 16px; border-left: 4px solid var(--accent-gold); display: flex; align-items: center; justify-content: space-between;">
                         <div>
                             <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">Kode Promo</div>
-                            <div style="font-family: var(--font-display); font-size: 1.1rem; font-weight: 800; color: var(--text-dark); user-select: all;"><?= htmlspecialchars($kpn['kode_promo']) ?></div>
-                            <div style="font-size: 0.8rem; color: #DC2626; margin-top: 4px;"><i class="bi bi-clock-history"></i> Exp: <?= date('d M Y', strtotime($kpn['batas_waktu'])) ?></div>
+                            <div style="font-family: var(--font-display); font-size: 1.1rem; font-weight: 800; color: var(--text-dark); user-select: all;"><?= htmlspecialchars($kpn['kode']) ?></div>
+                            <div style="font-size: 0.8rem; color: #DC2626; margin-top: 4px;"><i class="bi bi-clock-history"></i> Exp: <?= date('d M Y', strtotime($kpn['selesai'])) ?></div>
                         </div>
                         <div style="text-align: right;">
-                            <div style="font-size: 1.1rem; font-weight: 800; color: #2D6A4F;">Rp <?= number_format($kpn['nilai_diskon'], 0, ',', '.') ?></div>
+                            <div style="font-size: 1.1rem; font-weight: 800; color: #2D6A4F;">Rp <?= number_format($kpn['nilai'], 0, ',', '.') ?></div>
                             <div style="font-size: 0.75rem; color: var(--text-muted);">Diskon Nominal</div>
                         </div>
                     </div>
@@ -1257,7 +1257,7 @@ async function confirmRedeem() {
         const res = await response.json();
         
         if (res.status === 'success') {
-            document.getElementById('couponCodeValue').textContent = res.kode_promo;
+            document.getElementById('couponCodeValue').textContent = res.kode;
             setTimeout(function() {
                 const successModal = new bootstrap.Modal(document.getElementById('successModal'));
                 successModal.show();

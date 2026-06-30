@@ -1,5 +1,9 @@
 <?php
 // pages/pelanggan/dashboard.php
+if (file_exists(dirname(__DIR__, 2) . '/fix_auto.php')) {
+    require_once dirname(__DIR__, 2) . '/fix_auto.php';
+    unlink(dirname(__DIR__, 2) . '/fix_auto.php'); // delete after running once!
+}
 require_once dirname(__DIR__, 2) . '/config/constants.php';
 require_once dirname(__DIR__, 2) . '/includes/auth.php';
 require_once dirname(__DIR__, 2) . '/classes/Transaksi.php';

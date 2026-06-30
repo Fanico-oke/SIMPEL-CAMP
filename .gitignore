@@ -33,3 +33,14 @@ desktop.ini
 # Logs
 *.log
 
+
+# Kredensial Config
+/config/constants.php
+/config/database.php
+
+# Uploads folder pribadi user
+/uploads/
+/assets/img/pembayaran/
+/frontend/img/pembayaran/
+/frontend/img/barang/
+

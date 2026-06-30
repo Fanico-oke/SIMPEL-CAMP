@@ -393,23 +393,9 @@ switch ($method) {
                     $db->prepare("UPDATE reservasi SET status = 'selesai' WHERE id = ?")->execute([$transaksi['rsv_id']]);
                 }
 
-                // Kembalikan stok barang
-                if ($transaksi['rsv_id']) {
-                    // Cek kondisi barang dari pengembalian
-                    $stmtPg = $db->prepare("SELECT kondisi_barang FROM pengembalian WHERE transaksi_id = ?");
-                    $stmtPg->execute([$transaksi_id]);
-                    $pgData = $stmtPg->fetch();
-                    $kondisi = $pgData['kondisi_barang'] ?? 'baik';
-
-                    if ($kondisi !== 'hilang') {
-                        $stmtItems = $db->prepare("SELECT barang_id, jumlah FROM detail_reservasi WHERE reservasi_id = ?");
-                        $stmtItems->execute([$transaksi['rsv_id']]);
-                        foreach ($stmtItems->fetchAll() as $item) {
-                            $db->prepare("UPDATE barang SET stok_tersedia = stok_tersedia + ? WHERE id = ?")
-                                ->execute([$item['jumlah'], $item['barang_id']]);
-                        }
-                    }
-                }
+                // Kembalikan stok barang (TIDAK DILAKUKAN DI SINI)
+                // Stok barang sudah direstore pada saat admin memverifikasi pengembalian
+                // di api/pengembalian.php action='create' untuk menghindari double restore.
 
                 // Notifikasi ke pelanggan
                 $db->prepare("
@@ -442,9 +428,15 @@ switch ($method) {
 // =============================================
 function uploadBuktiBayar($file) {
     $allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    $allowedExts = ['jpg', 'jpeg', 'png', 'webp'];
     $maxSize = 2 * 1024 * 1024; // 2MB
 
-    if (!in_array($file['type'], $allowedTypes)) return false;
+    // Validate using finfo for actual mime type, not user provided
+    $finfo = finfo_open(FILEINFO_MIME_TYPE);
+    $realMime = finfo_file($finfo, $file['tmp_name']);
+    finfo_close($finfo);
+
+    if (!in_array($realMime, $allowedTypes)) return false;
     if ($file['size'] > $maxSize) return false;
 
     $uploadDir = dirname(__DIR__) . '/frontend/img/pembayaran/';
@@ -452,8 +444,10 @@ function uploadBuktiBayar($file) {
         mkdir($uploadDir, 0755, true);
     }
 
-    $ext = pathinfo($file['name'], PATHINFO_EXTENSION);
-    $filename = uniqid('pay_') . '.' . strtolower($ext);
+    $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+    if (!in_array($ext, $allowedExts)) return false; // Prevent RCE
+
+    $filename = uniqid('pay_') . '.' . $ext;
 
     if (move_uploaded_file($file['tmp_name'], $uploadDir . $filename)) {
         return $filename;

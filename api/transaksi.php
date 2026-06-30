@@ -230,9 +230,13 @@ switch ($method) {
                         'subtotal' => $subtotal
                     ];
 
-                    // Kurangi stok
-                    $db->prepare("UPDATE barang SET stok_tersedia = stok_tersedia - ? WHERE id = ?")
-                        ->execute([$jumlah, $barang_id]);
+                    // Kurangi stok (dengan proteksi race condition)
+                    $stmtStok = $db->prepare("UPDATE barang SET stok_tersedia = stok_tersedia - ? WHERE id = ? AND stok_tersedia >= ?");
+                    $stmtStok->execute([$jumlah, $barang_id, $jumlah]);
+                    if ($stmtStok->rowCount() === 0) {
+                        $db->rollBack();
+                        jsonError("Stok barang ID $barang_id tidak mencukupi saat proses");
+                    }
                 }
 
                 // Insert reservasi

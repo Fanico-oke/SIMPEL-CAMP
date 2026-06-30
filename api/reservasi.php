@@ -264,16 +264,24 @@ switch ($method) {
                 ]);
                 $reservasi_id = $db->lastInsertId();
 
-                // Insert detail reservasi
+                // Insert detail reservasi & kurangi stok
                 $stmtDetailInsert = $db->prepare("
                     INSERT INTO detail_reservasi (reservasi_id, barang_id, jumlah, harga_satuan, subtotal)
                     VALUES (?, ?, ?, ?, ?)
                 ");
+                $stmtStok = $db->prepare("UPDATE barang SET stok_tersedia = stok_tersedia - ? WHERE id = ? AND stok_tersedia >= ?");
+
                 foreach ($detail_items as $di) {
                     $stmtDetailInsert->execute([
                         $reservasi_id, $di['barang_id'], $di['jumlah'],
                         $di['harga_satuan'], $di['subtotal']
                     ]);
+                    
+                    $stmtStok->execute([$di['jumlah'], $di['barang_id'], $di['jumlah']]);
+                    if ($stmtStok->rowCount() === 0) {
+                        $db->rollBack();
+                        jsonError("Stok barang ID {$di['barang_id']} tidak mencukupi pada saat proses");
+                    }
                 }
 
                 // Update terpakai promo

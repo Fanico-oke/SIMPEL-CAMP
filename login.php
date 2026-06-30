@@ -4,6 +4,7 @@ require_once 'config/constants.php';
 require_once 'config/database.php';
 require_once 'classes/User.php';
 require_once 'classes/LogAktivitas.php';
+require_once 'includes/auth.php';
 
 // Redirect if already logged in
 if (isset($_SESSION['user_id'])) {
@@ -27,8 +28,12 @@ if (isset($_SESSION['flash_error'])) {
 
 // Proses Login
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $email = trim($_POST['email'] ?? '');
-    $password = $_POST['password'] ?? '';
+    $csrf = $_POST['csrf_token'] ?? '';
+    if (!verify_csrf($csrf)) {
+        $error = 'Token keamanan tidak valid. Silakan muat ulang halaman.';
+    } else {
+        $email = trim($_POST['email'] ?? '');
+        $password = $_POST['password'] ?? '';
 
     // Validasi input
     if (empty($email) || empty($password)) {
@@ -68,6 +73,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $error = 'Email atau password salah.';
         }
+    }
     }
 }
 ?>
@@ -123,7 +129,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             <!-- Login Form -->
             <form action="" method="POST" id="loginForm" autocomplete="off">
-
+                <input type="hidden" name="csrf_token" value="<?= csrf_token() ?>">
                 <!-- Email -->
                 <div class="mb-3">
                     <label for="email" class="form-label">Email</label>

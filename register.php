@@ -5,6 +5,7 @@ require_once 'config/database.php';
 require_once 'classes/User.php';
 require_once 'classes/MemberLevel.php';
 require_once 'classes/LogAktivitas.php';
+require_once 'includes/auth.php';
 
 // Redirect if already logged in
 if (isset($_SESSION['user_id'])) {
@@ -19,12 +20,16 @@ $old = []; // Untuk mengisi kembali form jika error
 
 // Proses Registrasi
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $nama     = trim($_POST['nama'] ?? '');
-    $email    = trim($_POST['email'] ?? '');
-    $no_telp  = trim($_POST['no_telp'] ?? '');
-    $alamat   = trim($_POST['alamat'] ?? '');
-    $password = $_POST['password'] ?? '';
-    $password_confirm = $_POST['password_confirm'] ?? '';
+    $csrf = $_POST['csrf_token'] ?? '';
+    if (!verify_csrf($csrf)) {
+        $error = 'Token keamanan tidak valid. Silakan muat ulang halaman.';
+    } else {
+        $nama     = trim($_POST['nama'] ?? '');
+        $email    = trim($_POST['email'] ?? '');
+        $no_telp  = trim($_POST['no_telp'] ?? '');
+        $alamat   = trim($_POST['alamat'] ?? '');
+        $password = $_POST['password'] ?? '';
+        $password_confirm = $_POST['password_confirm'] ?? '';
 
     // Simpan data lama untuk re-fill form
     $old = compact('nama', 'email', 'no_telp', 'alamat');
@@ -92,6 +97,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
     }
+    }
 }
 ?>
 <!DOCTYPE html>
@@ -139,6 +145,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             <!-- Register Form -->
             <form action="" method="POST" id="registerForm" autocomplete="off">
+                <input type="hidden" name="csrf_token" value="<?= csrf_token() ?>">
                 <div class="row">
 
                     <!-- Nama Lengkap -->

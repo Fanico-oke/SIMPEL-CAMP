@@ -414,7 +414,7 @@ if ($transaksi && !empty($transaksi['reservasi_id'])) {
                                 <div class="order-item-icon">â›º</div>
                                 <div class="order-item-info">
                                     <div class="order-item-name">Tenda Dome Eiger 4P</div>
-                                    <div class="order-item-qty">1 unit Ã— 3 hari Ã— Rp 75.000</div>
+                                    <div class="order-item-qty">1 unit x 3 hari x Rp 75.000</div>
                                 </div>
                                 <div class="order-item-price">Rp 225.000</div>
                             </div>
@@ -422,7 +422,7 @@ if ($transaksi && !empty($transaksi['reservasi_id'])) {
                                 <div class="order-item-icon">ðŸ”¦</div>
                                 <div class="order-item-info">
                                     <div class="order-item-name">Headlamp LED Pro</div>
-                                    <div class="order-item-qty">2 unit Ã— 3 hari Ã— Rp 10.000</div>
+                                    <div class="order-item-qty">2 unit x 3 hari x Rp 10.000</div>
                                 </div>
                                 <div class="order-item-price">Rp 60.000</div>
                             </div>
@@ -474,7 +474,7 @@ if ($transaksi && !empty($transaksi['reservasi_id'])) {
         </div>
         <div class="faq-item" onclick="toggleFaq(this)">
             <div class="faq-question">Berapa lama verifikasi pembayaran?<i class="bi bi-chevron-down faq-chevron"></i></div>
-            <div class="faq-answer">Transfer Bank: 1Ã—24 jam setelah bukti transfer diunggah. QRIS: otomatis 5-15 menit. Cash: diverifikasi saat Anda datang ke outlet.</div>
+            <div class="faq-answer">Transfer Bank: 1x24 jam setelah bukti transfer diunggah. QRIS: otomatis 5-15 menit. Cash: diverifikasi saat Anda datang ke outlet.</div>
         </div>
         <div class="faq-item" onclick="toggleFaq(this)">
             <div class="faq-question">Apa yang terjadi jika waktu habis?<i class="bi bi-chevron-down faq-chevron"></i></div>

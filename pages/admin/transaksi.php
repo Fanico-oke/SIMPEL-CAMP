@@ -46,7 +46,18 @@ $perpPending = Perpanjangan::getAll(['status' => 'pending']);
 $perpHistory = Perpanjangan::getAll(['limit' => 5]);
 
 // Data untuk Tab 4: Pengembalian
-$pengembalianList = Pengembalian::getAll(['limit' => 5]);
+$pengembalianList = Pengembalian::getAll(5); // Fix argument type
+$stmtPgPending = Database::getInstance()->prepare("
+    SELECT p.*, t.kode_transaksi, u.nama AS nama_user, t.id AS trx_id, r.id AS rsv_id
+    FROM pengembalian p
+    JOIN transaksi t ON p.transaksi_id = t.id
+    JOIN users u ON t.user_id = u.id
+    LEFT JOIN reservasi r ON t.reservasi_id = r.id
+    WHERE p.status = 'menunggu_cek'
+    ORDER BY p.created_at ASC
+");
+$stmtPgPending->execute();
+$pengembalianPending = $stmtPgPending->fetchAll();
 ?>
 <!DOCTYPE html><html lang="id"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -167,7 +178,7 @@ h1,h2,h3,h4,h5,h6,.heading{font-family:'Outfit',sans-serif}
         <div class="tr-tabs">
             <button class="tr-tab active" id="tabBtnReservasi" onclick="switchTab('reservasi')"><i class="bi bi-calendar-check me-1"></i>Reservasi <span class="badge bg-warning text-dark"><?= $rsvPending ?></span></button>
             <button class="tr-tab" id="tabBtnTransaksi" onclick="switchTab('transaksi')"><i class="bi bi-cart-plus me-1"></i>Transaksi Baru</button>
-            <button class="tr-tab" id="tabBtnPerpanjangan" onclick="switchTab('perpanjangan')"><i class="bi bi-arrow-clockwise me-1"></i>Perpanjangan</button>
+            <button class="tr-tab" id="tabBtnPerpanjangan" onclick="switchTab('perpanjangan')"><i class="bi bi-arrow-clockwise me-1"></i>Perpanjangan <?= count($perpPending) > 0 ? '<span class="badge bg-danger ms-1">'.count($perpPending).'</span>' : '' ?></button>
             <button class="tr-tab" id="tabBtnPengembalian" onclick="switchTab('pengembalian')"><i class="bi bi-box-arrow-in-left me-1"></i>Pengembalian</button>
         </div>
 
@@ -271,7 +282,26 @@ h1,h2,h3,h4,h5,h6,.heading{font-family:'Outfit',sans-serif}
                     $ppUser = $pp['user_nama'] ?? 'Unknown';
                     $ppInitial = strtoupper(substr($ppUser, 0, 1)) . strtoupper(substr(explode(' ', $ppUser)[1] ?? '', 0, 1));
                 ?>
-                <div class="col-lg-6 stagger-item"><div class="ext-card"><div class="d-flex align-items-center gap-3 mb-3"><div class="avatar-circle"><?= $ppInitial ?></div><div><h6 class="heading fw-bold mb-0"><?= htmlspecialchars($ppUser) ?></h6><span class="rsv-id">EXT-<?= $pp['id'] ?></span></div></div><div class="info-row"><i class="bi bi-calendar3"></i> <?= date('d M', strtotime($pp['tanggal_lama'])) ?> → <?= date('d M Y', strtotime($pp['tanggal_baru'])) ?></div><div class="ext-cost mb-3">Biaya Tambahan: Rp <?= number_format($pp['biaya_tambahan'] ?? 0, 0, ',', '.') ?></div><div class="d-flex gap-2"><button class="btn btn-approve flex-fill" onclick="approvePerpanjangan(<?= $pp['id'] ?>)"><i class="bi bi-check-lg me-1"></i>Setujui</button><button class="btn btn-reject" onclick="rejectPerpanjangan(<?= $pp['id'] ?>)"><i class="bi bi-x-lg"></i></button></div></div></div>
+                <div class="col-lg-6 stagger-item">
+                    <div class="ext-card">
+                        <div class="d-flex align-items-center gap-3 mb-3">
+                            <div class="avatar-circle"><?= $ppInitial ?></div>
+                            <div>
+                                <h6 class="heading fw-bold mb-0"><?= htmlspecialchars($ppUser) ?></h6>
+                                <span class="rsv-id">EXT-<?= $pp['id'] ?> (<?= strtoupper($pp['metode_bayar'] ?? 'CASH') ?>)</span>
+                            </div>
+                        </div>
+                        <div class="info-row"><i class="bi bi-calendar3"></i> <?= date('d M', strtotime($pp['tanggal_lama'])) ?> → <?= date('d M Y', strtotime($pp['tanggal_baru'])) ?></div>
+                        <div class="ext-cost mb-3">Biaya Tambahan: Rp <?= number_format($pp['biaya_tambahan'] ?? 0, 0, ',', '.') ?></div>
+                        <?php if (!empty($pp['bukti_bayar'])): ?>
+                        <button type="button" onclick="openImageModal('<?= BASE_URL ?>/assets/img/pembayaran/<?= $pp['bukti_bayar'] ?>')" class="btn btn-sm btn-outline-primary w-100 mb-3"><i class="bi bi-image me-1"></i>Lihat Bukti Transfer</button>
+                        <?php endif; ?>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-approve flex-fill" onclick="approvePerpanjangan(<?= $pp['id'] ?>)"><i class="bi bi-check-lg me-1"></i>Setujui</button>
+                            <button class="btn btn-reject" onclick="rejectPerpanjangan(<?= $pp['id'] ?>)"><i class="bi bi-x-lg"></i></button>
+                        </div>
+                    </div>
+                </div>
                 <?php endforeach; ?>
                 <?php endif; ?>
             </div>
@@ -300,6 +330,30 @@ h1,h2,h3,h4,h5,h6,.heading{font-family:'Outfit',sans-serif}
                 <?php endforeach; ?>
                 <?php endif; ?>
             </div>
+            
+            <!-- Section Menunggu Dicek -->
+            <div class="trx-table stagger-item mb-4"><div class="p-3"><h5 class="heading fw-bold mb-0" style="color: #d97706;"><i class="bi bi-hourglass-split me-2"></i>Menunggu Dicek</h5></div><div class="table-responsive"><table class="table align-middle"><thead><tr><th>ID Transaksi</th><th>Pelanggan</th><th>Tgl Pengajuan</th><th>Foto Bukti</th><th>Aksi</th></tr></thead><tbody>
+                <?php if (empty($pengembalianPending)): ?>
+                <tr><td colspan="5" class="text-center text-muted py-4">Tidak ada pengembalian yang menunggu dicek</td></tr>
+                <?php else: ?>
+                <?php foreach ($pengembalianPending as $pend): ?>
+                <tr>
+                    <td class="mono fw-semibold"><?= htmlspecialchars($pend['kode_transaksi']) ?></td>
+                    <td><?= htmlspecialchars($pend['nama_user']) ?></td>
+                    <td><?= date('d M Y H:i', strtotime($pend['created_at'])) ?></td>
+                    <td>
+                        <?php if(!empty($pend['foto_bukti'])): ?>
+                            <button type="button" onclick="openImageModal('<?= BASE_URL ?>/uploads/pengembalian/<?= $pend['foto_bukti'] ?>')" class="btn btn-sm btn-light" style="border:1px solid #ddd"><i class="bi bi-image me-1"></i>Lihat Foto</button>
+                        <?php else: ?>
+                            <span class="text-muted">-</span>
+                        <?php endif; ?>
+                    </td>
+                    <td><a href="?page=detail_reservasi&id=<?= $pend['rsv_id'] ?>" class="btn btn-sm btn-approve" style="padding:5px 12px; font-size:0.8rem">Proses</a></td>
+                </tr>
+                <?php endforeach; ?>
+                <?php endif; ?>
+            </tbody></table></div></div>
+
             <div class="trx-table stagger-item"><div class="p-3"><h5 class="heading fw-bold mb-0"><i class="bi bi-clock-history me-2 text-muted"></i>Riwayat Pengembalian</h5></div><div class="table-responsive"><table class="table align-middle"><thead><tr><th>ID</th><th>Tgl Kembali</th><th>Kondisi</th><th>Denda</th><th>Status</th></tr></thead><tbody>
                 <?php if (empty($pengembalianList)): ?>
                 <tr><td colspan="5" class="text-center text-muted py-4">Belum ada riwayat</td></tr>

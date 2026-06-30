@@ -653,7 +653,7 @@ if ($totalReviews == 0) {
 
                 <!-- ══════ Ketersediaan (Stock Progress) ══════ -->
                 <?php
-                    $stok_total = max((int)($barang['stok_total'] ?? 1), 1);
+                    $stok_total = max((int)($barang['stok'] ?? 1), 1);
                     $stok_tersedia = (int)($barang['stok_tersedia'] ?? 0);
                     $stok_persen = round(($stok_tersedia / $stok_total) * 100);
                     // Color logic: green (>50%), gold (20-50%), red (<20%)
@@ -701,7 +701,18 @@ if ($totalReviews == 0) {
                             <span style="font-size:0.72rem;color:var(--text-secondary);"><?= $stok_persen ?>% tersedia</span>
                             <span style="font-size:0.72rem;color:var(--text-secondary);"><?= $stok_total - $stok_tersedia ?> unit sedang disewa</span>
                         </div>
+                        </div>
                     </div>
+                </div>
+
+                <div style="background:#eef2ff; border:1px solid #c7d2fe; border-radius:12px; padding:1rem; margin-bottom:1.25rem;">
+                    <h6 style="font-family:var(--font-heading); font-weight:700; color:#3730a3; font-size:0.9rem; margin-bottom:0.5rem;"><i class="bi bi-info-circle-fill me-1"></i> Detail Pemesanan (Sewa)</h6>
+                    <ul style="margin:0; padding-left:1.2rem; font-size:0.8rem; color:#4338ca; line-height:1.6;">
+                        <li>Klik <b>Sewa Sekarang</b> untuk memasukkan barang ke Keranjang Sewa Anda.</li>
+                        <li>Tentukan <b>Tanggal Sewa</b> (mulai s/d selesai) pada halaman Keranjang.</li>
+                        <li>Wajib membayar minimal <b>Deposit 30%</b> atau Lunas saat Checkout.</li>
+                        <li>Pembayaran dapat melalui Transfer Bank, QRIS, atau Bayar di Toko (Walk-in).</li>
+                    </ul>
                 </div>
 
                 <!-- CTA Buttons -->

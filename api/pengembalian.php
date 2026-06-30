@@ -201,26 +201,53 @@ switch ($method) {
                 }
 
                 $file = $_FILES['bukti_foto'];
-                $allowed = ['image/jpeg', 'image/png', 'image/webp'];
-                if (!in_array($file['type'], $allowed)) {
+                $allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
+                $allowedExts = ['jpg', 'jpeg', 'png', 'webp'];
+
+                $finfo = finfo_open(FILEINFO_MIME_TYPE);
+                $realMime = finfo_file($finfo, $file['tmp_name']);
+                finfo_close($finfo);
+
+                if (!in_array($realMime, $allowedTypes)) {
                     jsonError('Format file harus JPG, PNG, atau WEBP');
                 }
                 if ($file['size'] > 5 * 1024 * 1024) {
                     jsonError('Ukuran file maksimal 5MB');
                 }
 
-                $ext = pathinfo($file['name'], PATHINFO_EXTENSION);
+                $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+                if (!in_array($ext, $allowedExts)) jsonError('Ekstensi file tidak valid');
+
                 $filename = 'kembali_' . $reservasi_id . '_' . time() . '.' . $ext;
                 $uploadDir = dirname(__DIR__) . '/uploads/pengembalian/';
                 if (!move_uploaded_file($file['tmp_name'], $uploadDir . $filename)) {
                     jsonError('Gagal mengunggah file');
                 }
 
-                // Update reservasi
+                // Get transaksi_id for this reservasi
+                $stmtTrx = $db->prepare("SELECT id FROM transaksi WHERE reservasi_id = ? ORDER BY id DESC LIMIT 1");
+                $stmtTrx->execute([$reservasi_id]);
+                $trx_id = $stmtTrx->fetchColumn();
+                
+                if (!$trx_id) jsonError('Transaksi tidak ditemukan untuk reservasi ini');
+
+                // Update reservasi status
                 $db->prepare("
-                    UPDATE reservasi SET status = 'menunggu_cek', bukti_kembali = ?, tgl_pengajuan_kembali = NOW()
+                    UPDATE reservasi SET status = 'menunggu_cek'
                     WHERE id = ?
-                ")->execute([$filename, $reservasi_id]);
+                ")->execute([$reservasi_id]);
+                
+                // Update transaksi status
+                $db->prepare("
+                    UPDATE transaksi SET status = 'menunggu_cek'
+                    WHERE id = ?
+                ")->execute([$trx_id]);
+
+                // Insert into pengembalian
+                $db->prepare("
+                    INSERT INTO pengembalian (transaksi_id, tanggal_kembali, kondisi_barang, foto_bukti, status)
+                    VALUES (?, NOW(), 'baik', ?, 'menunggu_cek')
+                ")->execute([$trx_id, $filename]);
 
                 // Notifikasi ke admin
                 $stmtAdmins = $db->query("SELECT id FROM users WHERE role IN ('admin','superadmin')");
@@ -276,9 +303,10 @@ switch ($method) {
                 if (!$transaksi) jsonError('Transaksi tidak ditemukan atau sudah selesai');
 
                 // Cek sudah pernah dikembalikan belum
-                $stmtExist = $db->prepare("SELECT id FROM pengembalian WHERE transaksi_id = ?");
+                $stmtExist = $db->prepare("SELECT id, status FROM pengembalian WHERE transaksi_id = ?");
                 $stmtExist->execute([$transaksi_id]);
-                if ($stmtExist->fetch()) {
+                $pengembalianExist = $stmtExist->fetch();
+                if ($pengembalianExist && $pengembalianExist['status'] !== 'menunggu_cek') {
                     jsonError('Pengembalian untuk transaksi ini sudah pernah diproses');
                 }
 
@@ -327,36 +355,48 @@ switch ($method) {
 
                 $total_denda = $denda_telat + $denda_kondisi;
 
-                // Insert pengembalian
-                $db->prepare("
-                    INSERT INTO pengembalian (transaksi_id, tanggal_kembali, hari_terlambat, kondisi_barang, denda, catatan)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                ")->execute([
-                    $transaksi_id, $tanggal_kembali, $hari_terlambat,
-                    $kondisi_barang, $total_denda, $catatan
-                ]);
+                $metode_denda = sanitize($input['metode_denda'] ?? 'transfer');
 
-                // Update denda di transaksi
-                if ($total_denda > 0) {
-                    // Ada denda → status menunggu_denda
-                    $db->prepare("UPDATE transaksi SET denda = ?, status = 'aktif' WHERE id = ?")
-                        ->execute([$total_denda, $transaksi_id]);
-                    if ($transaksi['rsv_id']) {
-                        $db->prepare("UPDATE reservasi SET status = 'menunggu_denda' WHERE id = ?")
-                            ->execute([$transaksi['rsv_id']]);
-                    }
-                } else {
-                    // Tidak ada denda → langsung selesai
-                    $db->prepare("UPDATE transaksi SET denda = 0, status = 'selesai' WHERE id = ?")
-                        ->execute([$transaksi_id]);
-                    if ($transaksi['rsv_id']) {
-                        $db->prepare("UPDATE reservasi SET status = 'selesai' WHERE id = ?")
-                            ->execute([$transaksi['rsv_id']]);
-                    }
+                // Tentukan status
+                $status_akhir = 'selesai';
+                if ($total_denda > 0 && $metode_denda === 'transfer') {
+                    $status_akhir = 'menunggu_denda';
                 }
 
-                // Kembalikan stok barang (kecuali hilang) — hanya jika tidak ada denda (langsung selesai)
-                if ($total_denda <= 0 && $transaksi['rsv_id'] && $kondisi_barang !== 'hilang') {
+                // Insert or Update pengembalian
+                if ($pengembalianExist) {
+                    $db->prepare("
+                        UPDATE pengembalian 
+                        SET tanggal_kembali = ?, hari_terlambat = ?, kondisi_barang = ?, denda = ?, catatan = ?, status = ?
+                        WHERE id = ?
+                    ")->execute([
+                        $tanggal_kembali, $hari_terlambat, $kondisi_barang, $total_denda, $catatan, 
+                        $status_akhir, $pengembalianExist['id']
+                    ]);
+                    $pengembalian_id = $pengembalianExist['id'];
+                } else {
+                    $db->prepare("
+                        INSERT INTO pengembalian (transaksi_id, tanggal_kembali, hari_terlambat, kondisi_barang, denda, catatan, status)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                    ")->execute([
+                        $transaksi_id, $tanggal_kembali, $hari_terlambat,
+                        $kondisi_barang, $total_denda, $catatan,
+                        $status_akhir
+                    ]);
+                    $pengembalian_id = $db->lastInsertId();
+                }
+
+                // Update denda di transaksi
+                $db->prepare("UPDATE transaksi SET denda = ?, status = ? WHERE id = ?")
+                    ->execute([$total_denda, $status_akhir, $transaksi_id]);
+                if ($transaksi['rsv_id']) {
+                    $db->prepare("UPDATE reservasi SET status = ? WHERE id = ?")
+                        ->execute([$status_akhir, $transaksi['rsv_id']]);
+                }
+
+                // Kembalikan stok barang (kecuali hilang)
+                // Stok selalu dikembalikan saat barang fisik diterima, terlepas dari denda belum lunas (Opsi B)
+                if ($transaksi['rsv_id'] && $kondisi_barang !== 'hilang') {
                     $stmtItems = $db->prepare("SELECT barang_id, jumlah FROM detail_reservasi WHERE reservasi_id = ?");
                     $stmtItems->execute([$transaksi['rsv_id']]);
 
@@ -437,7 +477,7 @@ switch ($method) {
                 $db->commit();
 
                 jsonSuccess([
-                    'id' => $db->lastInsertId(),
+                    'id' => $pengembalian_id,
                     'hari_terlambat' => $hari_terlambat,
                     'denda' => $total_denda
                 ], 'Pengembalian berhasil diproses');
@@ -446,8 +486,132 @@ switch ($method) {
                 error_log("API Pengembalian Create Error: " . $e->getMessage());
                 jsonError('Gagal memproses pengembalian', 500);
             }
+        } 
+        
+        // === BAYAR DENDA (Upload Bukti oleh Pelanggan) ===
+        elseif ($action === 'bayar_denda_transfer') {
+            $transaksi_id = intval($_POST['transaksi_id'] ?? 0);
+            if ($transaksi_id <= 0) jsonError('ID transaksi tidak valid');
+
+            try {
+                // Cek kepemilikan dan status
+                $stmt = $db->prepare("SELECT id FROM transaksi WHERE id = ? AND user_id = ? AND status = 'menunggu_denda'");
+                $stmt->execute([$transaksi_id, $user['id']]);
+                if (!$stmt->fetch()) jsonError('Transaksi tidak ditemukan atau tidak dalam status menunggu denda');
+
+                // Upload bukti
+                if (!isset($_FILES['bukti_denda']) || $_FILES['bukti_denda']['error'] !== UPLOAD_ERR_OK) {
+                    jsonError('Foto bukti transfer wajib diunggah');
+                }
+
+                $file = $_FILES['bukti_denda'];
+                $allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
+                $allowedExts = ['jpg', 'jpeg', 'png', 'webp'];
+
+                $finfo = finfo_open(FILEINFO_MIME_TYPE);
+                $realMime = finfo_file($finfo, $file['tmp_name']);
+                finfo_close($finfo);
+
+                if (!in_array($realMime, $allowedTypes)) jsonError('Format file harus JPG, PNG, atau WEBP');
+                if ($file['size'] > 5 * 1024 * 1024) jsonError('Ukuran maksimal 5MB');
+
+                $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+                if (!in_array($ext, $allowedExts)) jsonError('Ekstensi file tidak valid');
+
+                $filename = 'denda_' . $transaksi_id . '_' . time() . '.' . $ext;
+                $uploadDir = dirname(__DIR__) . '/uploads/pengembalian/';
+                if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
+
+                if (!move_uploaded_file($file['tmp_name'], $uploadDir . $filename)) {
+                    jsonError('Gagal mengunggah file');
+                }
+
+                $db->beginTransaction();
+
+                // Update pengembalian
+                $db->prepare("UPDATE pengembalian SET bukti_denda = ?, status = 'menunggu_verifikasi_denda' WHERE transaksi_id = ?")
+                   ->execute([$filename, $transaksi_id]);
+
+                // Update transaksi & reservasi
+                $db->prepare("UPDATE transaksi SET status = 'menunggu_verifikasi_denda' WHERE id = ?")->execute([$transaksi_id]);
+                
+                $stmtRsv = $db->prepare("SELECT reservasi_id FROM transaksi WHERE id = ?");
+                $stmtRsv->execute([$transaksi_id]);
+                $rsv_id = $stmtRsv->fetchColumn();
+                if ($rsv_id) {
+                    $db->prepare("UPDATE reservasi SET status = 'menunggu_verifikasi_denda' WHERE id = ?")->execute([$rsv_id]);
+                }
+
+                // Notifikasi ke Admin
+                $stmtAdmins = $db->query("SELECT id FROM users WHERE role IN ('admin','superadmin')");
+                foreach ($stmtAdmins->fetchAll() as $admin) {
+                    $db->prepare("
+                        INSERT INTO notifikasi (user_id, judul, pesan, tipe, link)
+                        VALUES (?, 'Bukti Denda Diunggah', ?, 'pengembalian', ?)
+                    ")->execute([
+                        $admin['id'],
+                        "Pelanggan {$user['nama']} telah mengunggah bukti pembayaran denda untuk transaksi #{$transaksi_id}",
+                        "?page=detail_reservasi&id=$rsv_id"
+                    ]);
+                }
+
+                $db->commit();
+                jsonSuccess([], 'Bukti denda berhasil diunggah. Menunggu verifikasi admin.');
+            } catch (PDOException $e) {
+                $db->rollBack();
+                error_log("API Pengembalian Bayar Denda Error: " . $e->getMessage());
+                jsonError('Gagal memproses pembayaran denda', 500);
+            }
+        }
+        
+        // === VERIFIKASI DENDA (Admin) ===
+        elseif ($action === 'verifikasi_denda') {
+            if (!in_array($user['role'], ['admin', 'superadmin'])) {
+                jsonError('Hanya admin yang bisa memverifikasi denda', 403);
+            }
+
+            $input = json_decode(file_get_contents('php://input'), true);
+            if (!$input) $input = $_POST;
+
+            $transaksi_id = intval($input['transaksi_id'] ?? 0);
+            if ($transaksi_id <= 0) jsonError('ID transaksi tidak valid');
+
+            try {
+                $db->beginTransaction();
+                
+                // Update pengembalian
+                $db->prepare("UPDATE pengembalian SET status = 'selesai' WHERE transaksi_id = ?")->execute([$transaksi_id]);
+                
+                // Update transaksi
+                $db->prepare("UPDATE transaksi SET status = 'selesai' WHERE id = ?")->execute([$transaksi_id]);
+                
+                $stmtRsv = $db->prepare("SELECT reservasi_id, user_id FROM transaksi WHERE id = ?");
+                $stmtRsv->execute([$transaksi_id]);
+                $trxInfo = $stmtRsv->fetch();
+                
+                if ($trxInfo && $trxInfo['reservasi_id']) {
+                    $db->prepare("UPDATE reservasi SET status = 'selesai' WHERE id = ?")->execute([$trxInfo['reservasi_id']]);
+                    
+                    // Notifikasi ke pelanggan
+                    $db->prepare("
+                        INSERT INTO notifikasi (user_id, judul, pesan, tipe, link)
+                        VALUES (?, 'Pembayaran Denda Dikonfirmasi', ?, 'pengembalian', ?)
+                    ")->execute([
+                        $trxInfo['user_id'],
+                        "Pembayaran denda untuk transaksi Anda telah dikonfirmasi dan selesai. Terima kasih!",
+                        "?page=pesanan"
+                    ]);
+                }
+
+                $db->commit();
+                jsonSuccess([], 'Pembayaran denda berhasil diverifikasi dan transaksi selesai.');
+            } catch (PDOException $e) {
+                $db->rollBack();
+                error_log("API Verifikasi Denda Error: " . $e->getMessage());
+                jsonError('Gagal memverifikasi denda', 500);
+            }
         } else {
-            jsonError('Action tidak valid. Gunakan: ajukan, create, hitung_denda');
+            jsonError('Action tidak valid. Gunakan: ajukan, create, hitung_denda, bayar_denda_transfer, verifikasi_denda');
         }
         break;
 

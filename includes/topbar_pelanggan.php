@@ -8,14 +8,20 @@ $_tb_user_name = $user_name ?? ($_SESSION['nama'] ?? 'Pelanggan');
 $_tb_initial = strtoupper(substr($_tb_user_name, 0, 1));
 $_tb_page_title = $page_title ?? 'Dashboard';
 
-// Notification count
-try {
-    $_tb_db = Database::getInstance();
-    $_tb_notif_stmt = $_tb_db->prepare("SELECT COUNT(*) FROM notifikasi WHERE user_id = ? AND is_read = 0");
-    $_tb_notif_stmt->execute([$_SESSION['user_id']]);
-    $_tb_notif_count = (int) $_tb_notif_stmt->fetchColumn();
-} catch (Exception $e) {
-    $_tb_notif_count = 0;
+// Notification count & Cart count
+$_tb_notif_count = 0;
+$_tb_cart_count = 0;
+if (isset($_SESSION['user_id'])) {
+    try {
+        $_tb_db = Database::getInstance();
+        $_tb_notif_stmt = $_tb_db->prepare("SELECT COUNT(*) FROM notifikasi WHERE user_id = ? AND is_read = 0");
+        $_tb_notif_stmt->execute([$_SESSION['user_id']]);
+        $_tb_notif_count = (int) $_tb_notif_stmt->fetchColumn();
+
+        $_tb_cart_stmt = $_tb_db->prepare("SELECT COUNT(*) FROM keranjang WHERE user_id = ?");
+        $_tb_cart_stmt->execute([$_SESSION['user_id']]);
+        $_tb_cart_count = (int) $_tb_cart_stmt->fetchColumn();
+    } catch (Exception $e) {}
 }
 ?>
 <div class="pelanggan-topbar">
@@ -47,6 +53,9 @@ try {
         <!-- Wishlist Heart -->
         <a href="<?= BASE_URL ?>/pages/pelanggan/wishlist.php" class="topbar-icon-btn" title="Keranjang Sewa">
             <i class="bi bi-heart"></i>
+            <?php if ($_tb_cart_count > 0): ?>
+            <span class="notif-dot"></span>
+            <?php endif; ?>
         </a>
 
         <!-- User Name (desktop only) -->

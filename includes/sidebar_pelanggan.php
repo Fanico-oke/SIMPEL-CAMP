@@ -12,6 +12,17 @@ if (!function_exists('isActive')) {
         return ($current === $pages) ? 'active' : '';
     }
 }
+
+// Notification count
+$sidebar_notif_count = 0;
+if (isset($_SESSION['user_id'])) {
+    try {
+        $_sb_db = Database::getInstance();
+        $_sb_notif_stmt = $_sb_db->prepare("SELECT COUNT(*) FROM notifikasi WHERE user_id = ? AND is_read = 0");
+        $_sb_notif_stmt->execute([$_SESSION['user_id']]);
+        $sidebar_notif_count = (int) $_sb_notif_stmt->fetchColumn();
+    } catch (Exception $e) {}
+}
 ?>
 
 <style>
@@ -317,7 +328,9 @@ if (!function_exists('isActive')) {
             <li class="nav-item <?= isActive('notifikasi', $currentPage) ?>">
                 <a href="<?= BASE_URL ?>/pages/pelanggan/notifikasi.php" class="nav-link" data-tooltip="Notifikasi">
                     <i class="bi bi-bell"></i><span class="nav-text">Notifikasi</span>
+                    <?php if ($sidebar_notif_count > 0): ?>
                     <span class="nav-badge-dot"></span>
+                    <?php endif; ?>
                 </a>
             </li>
         </ul>
